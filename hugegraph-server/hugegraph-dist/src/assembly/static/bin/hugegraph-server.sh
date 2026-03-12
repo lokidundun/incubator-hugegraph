@@ -115,7 +115,14 @@ fi
 if [[ $JAVA_VERSION -gt 9 ]]; then
     JAVA_OPTIONS="${JAVA_OPTIONS} --add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED \
                                   --add-modules=jdk.unsupported \
-                                  --add-exports=java.base/sun.nio.ch=ALL-UNNAMED "
+                                  --add-exports=java.base/sun.nio.ch=ALL-UNNAMED \
+                                  --add-opens=java.base/java.lang=ALL-UNNAMED \
+                                  --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
+                                  --add-opens=java.base/java.util=ALL-UNNAMED \
+                                  --add-opens=java.base/java.nio=ALL-UNNAMED \
+                                  --add-opens=java.base/sun.security.ssl=ALL-UNNAMED \
+                                  --add-opens=java.base/java.io=ALL-UNNAMED \
+                                  --add-opens=java.base/java.net=ALL-UNNAMED"
 fi
 
 # Using G1GC as the default garbage collector (Recommended for large memory machines)

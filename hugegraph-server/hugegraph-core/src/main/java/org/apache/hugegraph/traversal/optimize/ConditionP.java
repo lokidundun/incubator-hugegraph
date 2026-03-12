@@ -17,18 +17,26 @@
 
 package org.apache.hugegraph.traversal.optimize;
 
-import java.util.function.BiPredicate;
-
 import org.apache.hugegraph.backend.query.Condition;
 import org.apache.tinkerpop.gremlin.process.traversal.P;
+import org.apache.tinkerpop.gremlin.process.traversal.PBiPredicate;
 
 public class ConditionP extends P<Object> {
 
     private static final long serialVersionUID = 9094970577400072902L;
 
-    private ConditionP(final BiPredicate<Object, Object> predicate,
+    private ConditionP(final Condition.RelationType relationType,
                        Object value) {
-        super(predicate, value);
+        super(wrapPredicate(relationType), value);
+    }
+
+    private static <V> PBiPredicate<V> wrapPredicate(final Condition.RelationType relationType) {
+        return new PBiPredicate<V>() {
+            @Override
+            public boolean test(V v1, V v2) {
+                return relationType.test(v1, v2);
+            }
+        };
     }
 
     public static ConditionP textContains(Object value) {

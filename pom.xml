@@ -91,8 +91,8 @@
         <hugegraph-commons.version>1.7.0</hugegraph-commons.version>
         <lombok.version>1.18.30</lombok.version>
         <release.name>hugegraph</release.name>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <shell-executable>bash</shell-executable>
         <toolchain.vision>1.5.0</toolchain.vision>

@@ -17,7 +17,7 @@
 
 # Dockerfile for HugeGraph Store
 # 1st stage: build source code
-FROM maven:3.9.0-eclipse-temurin-11 AS build
+FROM maven:3.9.0-eclipse-temurin-17 AS build
 
 COPY . /pkg
 WORKDIR /pkg
@@ -28,13 +28,19 @@ RUN mvn package $MAVEN_ARGS -e -B -ntp -Dmaven.test.skip=true -Dmaven.javadoc.sk
 
 # 2nd stage: runtime env
 # Note: ZGC (The Z Garbage Collector) is only supported on ARM-Mac with java > 13
-FROM eclipse-temurin:11-jre-jammy
+FROM eclipse-temurin:17-jre-jammy
 
 COPY --from=build /pkg/hugegraph-store/apache-hugegraph-store-incubating-*/ /hugegraph-store/
 LABEL maintainer="HugeGraph Docker Maintainers <dev@hugegraph.apache.org>"
 
 # TODO: use g1gc or zgc as default
-ENV JAVA_OPTS="-XX:+UnlockExperimentalVMOptions -XX:+UseContainerSupport -XX:MaxRAMPercentage=50 -XshowSettings:vm" \
+ENV JAVA_OPTS="-XX:+UnlockExperimentalVMOptions -XX:+UseContainerSupport -XX:MaxRAMPercentage=50 -XshowSettings:vm \
+    --add-exports=java.base/jdk.internal.reflect=ALL-UNNAMED \
+    --add-opens=java.base/java.lang=ALL-UNNAMED \
+    --add-opens=java.base/java.lang.reflect=ALL-UNNAMED \
+    --add-opens=java.base/java.util=ALL-UNNAMED \
+    --add-opens=java.base/java.nio=ALL-UNNAMED \
+    --add-opens=java.base/sun.security.ssl=ALL-UNNAMED" \
     HUGEGRAPH_HOME="hugegraph-store"
 
 #COPY . /hugegraph/hugegraph-store

@@ -117,7 +117,8 @@ public class GroupAPI extends API {
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     @RolesAllowed({"admin"})
     public String get(@Context GraphManager manager,
-                      @Parameter(description = "The group id") @PathParam("id") String id) {
+                      @Parameter(description = "The group id")
+                      @PathParam("id") String id) {
         LOG.debug("get group: {}", id);
 
         HugeGroup group = manager.authManager().getGroup(IdGenerator.of(id));
@@ -130,7 +131,8 @@ public class GroupAPI extends API {
     @Consumes(APPLICATION_JSON)
     @RolesAllowed({"admin"})
     public void delete(@Context GraphManager manager,
-                       @Parameter(description = "The group id") @PathParam("id") String id) {
+                       @Parameter(description = "The group id")
+                       @PathParam("id") String id) {
         LOG.debug("delete group: {}", id);
 
         try {

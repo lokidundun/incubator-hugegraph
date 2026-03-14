@@ -81,7 +81,8 @@ public class GroupAPI extends API {
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     @RolesAllowed({"admin"})
     public String update(@Context GraphManager manager,
-                         @Parameter(description = "The group id") @PathParam("id") String id,
+                         @Parameter(description = "The group id")
+                         @PathParam("id") String id,
                          JsonGroup jsonGroup) {
         LOG.debug("update group: {}", jsonGroup);
         checkUpdatingBody(jsonGroup);
@@ -102,7 +103,8 @@ public class GroupAPI extends API {
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     @RolesAllowed({"admin"})
     public String list(@Context GraphManager manager,
-                       @Parameter(description = "The limit of results to return") @QueryParam("limit") @DefaultValue("100") long limit) {
+                       @Parameter(description = "The limit of results to return")
+                       @QueryParam("limit") @DefaultValue("100") long limit) {
         LOG.debug("list groups");
 
         List<HugeGroup> groups = manager.authManager().listAllGroups(limit);

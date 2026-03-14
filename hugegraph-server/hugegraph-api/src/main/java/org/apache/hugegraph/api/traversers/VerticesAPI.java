@@ -61,9 +61,12 @@ public class VerticesAPI extends API {
     @Compress
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String list(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The graph name") @PathParam("graph") String graph,
-                       @Parameter(description = "The vertex IDs") @QueryParam("ids") List<String> stringIds) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The graph name")
+                       @PathParam("graph") String graph,
+                       @Parameter(description = "The vertex IDs")
+                       @QueryParam("ids") List<String> stringIds) {
         LOG.debug("Graph [{}] get vertices by ids: {}", graph, stringIds);
 
         E.checkArgument(stringIds != null && !stringIds.isEmpty(),

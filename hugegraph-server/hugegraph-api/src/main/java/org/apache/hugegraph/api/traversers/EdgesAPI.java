@@ -88,7 +88,8 @@ public class EdgesAPI extends API {
     public String shards(@Context GraphManager manager,
                          @PathParam("graphspace") String graphSpace,
                          @PathParam("graph") String graph,
-                         @Parameter(description = "The split size for shards") @QueryParam("split_size") long splitSize) {
+                         @Parameter(description = "The split size for shards")
+                         @QueryParam("split_size") long splitSize) {
         LOG.debug("Graph [{}] get vertex shards with split size '{}'",
                   graph, splitSize);
 

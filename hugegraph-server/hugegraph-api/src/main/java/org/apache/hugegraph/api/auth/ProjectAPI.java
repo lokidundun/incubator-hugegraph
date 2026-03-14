@@ -70,7 +70,8 @@ public class ProjectAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String create(@Context GraphManager manager,
-                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The graph space name")
+                         @PathParam("graphspace") String graphSpace,
                          JsonProject jsonProject) {
         LOG.debug("GraphSpace [{}] create project: {}", graphSpace, jsonProject);
         checkCreatingBody(jsonProject);
@@ -91,9 +92,16 @@ public class ProjectAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String update(@Context GraphManager manager,
-                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                         @Parameter(description = "The project id") @PathParam("id") String id,
-                         @Parameter(description = "The action to perform: add_graph, remove_graph, or empty for description update") @QueryParam("action") String action,
+                         @Parameter(description = "The graph space name")
+                         @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The project id")
+                         @PathParam("id") String id,
+                         @Parameter(
+                                 description = "The action to perform: " +
+                                               "add_graph, remove_graph, " +
+                                               "or empty for description " +
+                                               "update")
+                         @QueryParam("action") String action,
                          JsonProject jsonProject) {
         LOG.debug("GraphSpace [{}] update {} project: {}", graphSpace, action,
                   jsonProject);
@@ -128,8 +136,10 @@ public class ProjectAPI extends API {
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String list(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The limit of results to return") @QueryParam("limit") @DefaultValue("100") long limit) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The limit of results to return")
+                       @QueryParam("limit") @DefaultValue("100") long limit) {
         LOG.debug("GraphSpace [{}] list project", graphSpace);
 
         List<HugeProject> projects = manager.authManager()
@@ -142,8 +152,10 @@ public class ProjectAPI extends API {
     @Path("{id}")
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String get(@Context GraphManager manager,
-                      @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                      @Parameter(description = "The project id") @PathParam("id") String id) {
+                      @Parameter(description = "The graph space name")
+                      @PathParam("graphspace") String graphSpace,
+                      @Parameter(description = "The project id")
+                      @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] get project: {}", graphSpace, id);
 
         HugeProject project;
@@ -160,8 +172,10 @@ public class ProjectAPI extends API {
     @Path("{id}")
     @Consumes(APPLICATION_JSON)
     public void delete(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The project id") @PathParam("id") String id) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The project id")
+                       @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] delete project: {}", graphSpace, id);
 
         try {

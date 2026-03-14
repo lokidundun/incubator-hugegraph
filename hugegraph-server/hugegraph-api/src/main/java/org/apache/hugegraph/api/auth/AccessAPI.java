@@ -64,7 +64,8 @@ public class AccessAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String create(@Context GraphManager manager,
-                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The graph space name")
+                         @PathParam("graphspace") String graphSpace,
                          JsonAccess jsonAccess) {
         LOG.debug("GraphSpace [{}] create access: {}", graphSpace, jsonAccess);
         checkCreatingBody(jsonAccess);
@@ -80,8 +81,10 @@ public class AccessAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String update(@Context GraphManager manager,
-                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                         @Parameter(description = "The access id") @PathParam("id") String id,
+                         @Parameter(description = "The graph space name")
+                         @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The access id")
+                         @PathParam("id") String id,
                          JsonAccess jsonAccess) {
         LOG.debug("GraphSpace [{}] update access: {}", graphSpace, jsonAccess);
         checkUpdatingBody(jsonAccess);
@@ -101,10 +104,14 @@ public class AccessAPI extends API {
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String list(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The group id to filter by") @QueryParam("group") String group,
-                       @Parameter(description = "The target id to filter by") @QueryParam("target") String target,
-                       @Parameter(description = "The limit of results to return") @QueryParam("limit") @DefaultValue("100") long limit) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The group id to filter by")
+                       @QueryParam("group") String group,
+                       @Parameter(description = "The target id to filter by")
+                       @QueryParam("target") String target,
+                       @Parameter(description = "The limit of results to return")
+                       @QueryParam("limit") @DefaultValue("100") long limit) {
         LOG.debug("GraphSpace [{}] list accesses by group {} or target {}",
                   graphSpace, group, target);
         E.checkArgument(group == null || target == null,
@@ -128,8 +135,10 @@ public class AccessAPI extends API {
     @Path("{id}")
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String get(@Context GraphManager manager,
-                      @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                      @Parameter(description = "The access id") @PathParam("id") String id) {
+                      @Parameter(description = "The graph space name")
+                      @PathParam("graphspace") String graphSpace,
+                      @Parameter(description = "The access id")
+                      @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] get access: {}", graphSpace, id);
 
         HugeAccess access = manager.authManager().getAccess(UserAPI.parseId(id));
@@ -141,8 +150,10 @@ public class AccessAPI extends API {
     @Path("{id}")
     @Consumes(APPLICATION_JSON)
     public void delete(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The access id") @PathParam("id") String id) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The access id")
+                       @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] delete access: {}", graphSpace, id);
 
         try {

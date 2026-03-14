@@ -51,7 +51,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.Consumes;
@@ -75,21 +74,32 @@ public class KoutAPI extends TraverserAPI {
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String get(@Context GraphManager manager,
-                      @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                      @Parameter(description = "The graph name") @PathParam("graph") String graph,
-                      @Parameter(description = "The source vertex ID") @QueryParam("source") String source,
-                      @Parameter(description = "The direction of traversal") @QueryParam("direction") String direction,
-                      @Parameter(description = "The edge label to traverse") @QueryParam("label") String edgeLabel,
-                      @Parameter(description = "The maximum depth of traversal") @QueryParam("max_depth") int depth,
-                      @Parameter(description = "Whether to find nearest vertices first") @QueryParam("nearest")
+                      @Parameter(description = "The graph space name")
+                      @PathParam("graphspace") String graphSpace,
+                      @Parameter(description = "The graph name")
+                      @PathParam("graph") String graph,
+                      @Parameter(description = "The source vertex ID")
+                      @QueryParam("source") String source,
+                      @Parameter(description = "The direction of traversal")
+                      @QueryParam("direction") String direction,
+                      @Parameter(description = "The edge label to traverse")
+                      @QueryParam("label") String edgeLabel,
+                      @Parameter(description = "The maximum depth of traversal")
+                      @QueryParam("max_depth") int depth,
+                      @Parameter(description = "Whether to find nearest vertices first")
+                      @QueryParam("nearest")
                       @DefaultValue("true") boolean nearest,
-                      @Parameter(description = "Whether to return only count") @QueryParam("count_only")
+                      @Parameter(description = "Whether to return only count")
+                      @QueryParam("count_only")
                       @DefaultValue("false") boolean count_only,
-                      @Parameter(description = "The maximum degree of vertices") @QueryParam("max_degree")
+                      @Parameter(description = "The maximum degree of vertices")
+                      @QueryParam("max_degree")
                       @DefaultValue(DEFAULT_MAX_DEGREE) long maxDegree,
-                      @Parameter(description = "The capacity of the traversal") @QueryParam("capacity")
+                      @Parameter(description = "The capacity of the traversal")
+                      @QueryParam("capacity")
                       @DefaultValue(DEFAULT_CAPACITY) long capacity,
-                      @Parameter(description = "The maximum number of results") @QueryParam("limit")
+                      @Parameter(description = "The maximum number of results")
+                      @QueryParam("limit")
                       @DefaultValue(DEFAULT_ELEMENTS_LIMIT) int limit) {
         LOG.debug("Graph [{}] get k-out from '{}' with " +
                   "direction '{}', edge label '{}', max depth '{}', nearest " +

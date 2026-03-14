@@ -63,7 +63,8 @@ public class BelongAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String create(@Context GraphManager manager,
-                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The graph space name")
+                         @PathParam("graphspace") String graphSpace,
                          JsonBelong jsonBelong) {
         LOG.debug("GraphSpace [{}] create belong: {}", graphSpace, jsonBelong);
         checkCreatingBody(jsonBelong);
@@ -79,8 +80,10 @@ public class BelongAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String update(@Context GraphManager manager,
-                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                         @Parameter(description = "The belong id") @PathParam("id") String id,
+                         @Parameter(description = "The graph space name")
+                         @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The belong id")
+                         @PathParam("id") String id,
                          JsonBelong jsonBelong) {
         LOG.debug("GraphSpace [{}] update belong: {}", graphSpace, jsonBelong);
         checkUpdatingBody(jsonBelong);
@@ -100,10 +103,14 @@ public class BelongAPI extends API {
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String list(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The user id to filter by") @QueryParam("user") String user,
-                       @Parameter(description = "The group id to filter by") @QueryParam("group") String group,
-                       @Parameter(description = "The limit of results to return") @QueryParam("limit") @DefaultValue("100") long limit) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The user id to filter by")
+                       @QueryParam("user") String user,
+                       @Parameter(description = "The group id to filter by")
+                       @QueryParam("group") String group,
+                       @Parameter(description = "The limit of results to return")
+                       @QueryParam("limit") @DefaultValue("100") long limit) {
         LOG.debug("GraphSpace [{}] list belongs by user {} or group {}",
                   graphSpace, user, group);
         E.checkArgument(user == null || group == null,
@@ -127,8 +134,10 @@ public class BelongAPI extends API {
     @Path("{id}")
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String get(@Context GraphManager manager,
-                      @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                      @Parameter(description = "The belong id") @PathParam("id") String id) {
+                      @Parameter(description = "The graph space name")
+                      @PathParam("graphspace") String graphSpace,
+                      @Parameter(description = "The belong id")
+                      @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] get belong: {}", graphSpace, id);
 
         HugeBelong belong = manager.authManager().getBelong(UserAPI.parseId(id));
@@ -140,8 +149,10 @@ public class BelongAPI extends API {
     @Path("{id}")
     @Consumes(APPLICATION_JSON)
     public void delete(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The belong id") @PathParam("id") String id) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The belong id")
+                       @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] delete belong: {}", graphSpace, id);
 
         try {

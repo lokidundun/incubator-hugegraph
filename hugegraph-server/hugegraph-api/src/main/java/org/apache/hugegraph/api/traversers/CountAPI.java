@@ -63,8 +63,10 @@ public class CountAPI extends API {
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String post(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The graph name") @PathParam("graph") String graph,
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The graph name")
+                       @PathParam("graph") String graph,
                        CountRequest request) {
         LOG.debug("Graph [{}] get count from '{}' with request {}",
                   graph, request);

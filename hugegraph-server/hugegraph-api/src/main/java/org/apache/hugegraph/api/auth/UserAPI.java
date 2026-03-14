@@ -66,7 +66,8 @@ public class UserAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String create(@Context GraphManager manager,
-                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The graph space name")
+                         @PathParam("graphspace") String graphSpace,
                          JsonUser jsonUser) {
         LOG.debug("GraphSpace [{}] create user: {}", graphSpace, jsonUser);
         checkCreatingBody(jsonUser);
@@ -82,8 +83,10 @@ public class UserAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String update(@Context GraphManager manager,
-                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                         @Parameter(description = "The user id") @PathParam("id") String id,
+                         @Parameter(description = "The graph space name")
+                         @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The user id")
+                         @PathParam("id") String id,
                          JsonUser jsonUser) {
         LOG.debug("GraphSpace [{}] update user: {}", graphSpace, jsonUser);
         checkUpdatingBody(jsonUser);
@@ -103,8 +106,10 @@ public class UserAPI extends API {
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String list(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The limit of results to return") @QueryParam("limit") @DefaultValue("100") long limit) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The limit of results to return")
+                       @QueryParam("limit") @DefaultValue("100") long limit) {
         LOG.debug("GraphSpace [{}] list users", graphSpace);
 
         List<HugeUser> users = manager.authManager().listAllUsers(limit);
@@ -116,8 +121,10 @@ public class UserAPI extends API {
     @Path("{id}")
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String get(@Context GraphManager manager,
-                      @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                      @Parameter(description = "The user id") @PathParam("id") String id) {
+                      @Parameter(description = "The graph space name")
+                      @PathParam("graphspace") String graphSpace,
+                      @Parameter(description = "The user id")
+                      @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] get user: {}", graphSpace, id);
 
         HugeUser user = manager.authManager().getUser(IdGenerator.of(id));
@@ -129,8 +136,10 @@ public class UserAPI extends API {
     @Path("{id}/role")
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String role(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The user id") @PathParam("id") String id) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The user id")
+                       @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] get user role: {}", graphSpace, id);
 
         HugeUser user = manager.authManager().getUser(IdGenerator.of(id));
@@ -142,8 +151,10 @@ public class UserAPI extends API {
     @Path("{id}")
     @Consumes(APPLICATION_JSON)
     public void delete(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The user id") @PathParam("id") String id) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The user id")
+                       @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] delete user: {}", graphSpace, id);
 
         try {

@@ -64,7 +64,8 @@ public class TargetAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String create(@Context GraphManager manager,
-                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The graph space name")
+                         @PathParam("graphspace") String graphSpace,
                          JsonTarget jsonTarget) {
         LOG.debug("GraphSpace [{}] create target: {}", graphSpace, jsonTarget);
         checkCreatingBody(jsonTarget);
@@ -80,8 +81,10 @@ public class TargetAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String update(@Context GraphManager manager,
-                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                         @Parameter(description = "The target id") @PathParam("id") String id,
+                         @Parameter(description = "The graph space name")
+                         @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The target id")
+                         @PathParam("id") String id,
                          JsonTarget jsonTarget) {
         LOG.debug("GraphSpace [{}] update target: {}", graphSpace, jsonTarget);
         checkUpdatingBody(jsonTarget);
@@ -101,8 +104,10 @@ public class TargetAPI extends API {
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String list(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The limit of results to return") @QueryParam("limit") @DefaultValue("100") long limit) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The limit of results to return")
+                       @QueryParam("limit") @DefaultValue("100") long limit) {
         LOG.debug("GraphSpace [{}] list targets", graphSpace);
 
         List<HugeTarget> targets = manager.authManager().listAllTargets(limit);
@@ -114,7 +119,8 @@ public class TargetAPI extends API {
     @Path("{id}")
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String get(@Context GraphManager manager,
-                      @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                      @Parameter(description = "The graph space name") @PathParam("graphspace")
+                      String graphSpace,
                       @Parameter(description = "The target id") @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] get target: {}", graphSpace, id);
 
@@ -127,8 +133,10 @@ public class TargetAPI extends API {
     @Path("{id}")
     @Consumes(APPLICATION_JSON)
     public void delete(@Context GraphManager manager,
-                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
-                       @Parameter(description = "The target id") @PathParam("id") String id) {
+                       @Parameter(description = "The graph space name")
+                       @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The target id")
+                       @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] delete target: {}", graphSpace, id);
 
         try {
@@ -188,7 +196,6 @@ public class TargetAPI extends API {
                    ", resources=" + resources +
                    '}';
         }
-
 
         @Override
         public void checkCreate(boolean isBatch) {

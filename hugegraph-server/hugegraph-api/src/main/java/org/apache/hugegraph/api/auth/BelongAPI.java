@@ -34,6 +34,8 @@ import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.Consumes;
@@ -61,7 +63,7 @@ public class BelongAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String create(@Context GraphManager manager,
-                         @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
                          JsonBelong jsonBelong) {
         LOG.debug("GraphSpace [{}] create belong: {}", graphSpace, jsonBelong);
         checkCreatingBody(jsonBelong);
@@ -77,8 +79,8 @@ public class BelongAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String update(@Context GraphManager manager,
-                         @PathParam("graphspace") String graphSpace,
-                         @PathParam("id") String id,
+                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The belong id") @PathParam("id") String id,
                          JsonBelong jsonBelong) {
         LOG.debug("GraphSpace [{}] update belong: {}", graphSpace, jsonBelong);
         checkUpdatingBody(jsonBelong);
@@ -98,10 +100,10 @@ public class BelongAPI extends API {
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String list(@Context GraphManager manager,
-                       @PathParam("graphspace") String graphSpace,
-                       @QueryParam("user") String user,
-                       @QueryParam("group") String group,
-                       @QueryParam("limit") @DefaultValue("100") long limit) {
+                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The user id to filter by") @QueryParam("user") String user,
+                       @Parameter(description = "The group id to filter by") @QueryParam("group") String group,
+                       @Parameter(description = "The limit of results to return") @QueryParam("limit") @DefaultValue("100") long limit) {
         LOG.debug("GraphSpace [{}] list belongs by user {} or group {}",
                   graphSpace, user, group);
         E.checkArgument(user == null || group == null,
@@ -125,8 +127,8 @@ public class BelongAPI extends API {
     @Path("{id}")
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String get(@Context GraphManager manager,
-                      @PathParam("graphspace") String graphSpace,
-                      @PathParam("id") String id) {
+                      @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                      @Parameter(description = "The belong id") @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] get belong: {}", graphSpace, id);
 
         HugeBelong belong = manager.authManager().getBelong(UserAPI.parseId(id));
@@ -138,8 +140,8 @@ public class BelongAPI extends API {
     @Path("{id}")
     @Consumes(APPLICATION_JSON)
     public void delete(@Context GraphManager manager,
-                       @PathParam("graphspace") String graphSpace,
-                       @PathParam("id") String id) {
+                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The belong id") @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] delete belong: {}", graphSpace, id);
 
         try {
@@ -154,10 +156,13 @@ public class BelongAPI extends API {
     private static class JsonBelong implements Checkable {
 
         @JsonProperty("user")
+        @Schema(description = "The user id", required = true)
         private String user;
         @JsonProperty("group")
+        @Schema(description = "The group id", required = true)
         private String group;
         @JsonProperty("belong_description")
+        @Schema(description = "The belong description")
         private String description;
 
         public HugeBelong build(HugeBelong belong) {

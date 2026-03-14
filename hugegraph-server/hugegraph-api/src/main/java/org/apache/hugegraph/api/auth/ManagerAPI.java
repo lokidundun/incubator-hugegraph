@@ -37,6 +37,8 @@ import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableMap;
 
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.Consumes;
@@ -62,7 +64,7 @@ public class ManagerAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String createManager(@Context GraphManager manager,
-                                @PathParam("graphspace") String graphSpace,
+                                @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
                                 JsonManager jsonManager) {
         LOG.debug("Create manager: {}", jsonManager);
         String user = jsonManager.user;
@@ -113,9 +115,9 @@ public class ManagerAPI extends API {
     @Timed
     @Consumes(APPLICATION_JSON)
     public void delete(@Context GraphManager manager,
-                       @PathParam("graphspace") String graphSpace,
-                       @QueryParam("user") String user,
-                       @QueryParam("type") HugePermission type) {
+                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The user name") @QueryParam("user") String user,
+                       @Parameter(description = "The manager type: SPACE, SPACE_MEMBER, or ADMIN") @QueryParam("type") HugePermission type) {
         LOG.debug("Delete graph manager: {} {} {}", user, type, graphSpace);
         E.checkArgument(!"admin".equals(user) ||
                         type != HugePermission.ADMIN,
@@ -157,8 +159,8 @@ public class ManagerAPI extends API {
     @Timed
     @Consumes(APPLICATION_JSON)
     public String list(@Context GraphManager manager,
-                       @PathParam("graphspace") String graphSpace,
-                       @QueryParam("type") HugePermission type) {
+                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The manager type: SPACE, SPACE_MEMBER, or ADMIN") @QueryParam("type") HugePermission type) {
         LOG.debug("list graph manager: {} {}", type, graphSpace);
 
         AuthManager authManager = manager.authManager();
@@ -187,8 +189,8 @@ public class ManagerAPI extends API {
     @Path("check")
     @Consumes(APPLICATION_JSON)
     public String checkRole(@Context GraphManager manager,
-                            @PathParam("graphspace") String graphSpace,
-                            @QueryParam("type") HugePermission type) {
+                            @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                            @Parameter(description = "The manager type: SPACE, SPACE_MEMBER, or ADMIN") @QueryParam("type") HugePermission type) {
         LOG.debug("check if current user is graph manager: {} {}", type, graphSpace);
 
         validType(type);
@@ -219,8 +221,8 @@ public class ManagerAPI extends API {
     @Path("role")
     @Consumes(APPLICATION_JSON)
     public String getRolesInGs(@Context GraphManager manager,
-                               @PathParam("graphspace") String graphSpace,
-                               @QueryParam("user") String user) {
+                               @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                               @Parameter(description = "The user name") @QueryParam("user") String user) {
         LOG.debug("get user [{}]'s role in graph space [{}]", user, graphSpace);
         AuthManager authManager = manager.authManager();
         List<HugePermission> result = new ArrayList<>();
@@ -264,8 +266,10 @@ public class ManagerAPI extends API {
     private static class JsonManager implements Checkable {
 
         @JsonProperty("user")
+        @Schema(description = "The user or group name", required = true)
         private String user;
         @JsonProperty("type")
+        @Schema(description = "The manager type: SPACE, SPACE_MEMBER, or ADMIN", required = true)
         private HugePermission type;
 
         @Override

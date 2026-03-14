@@ -48,6 +48,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableMap;
 
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Singleton;
@@ -78,7 +80,9 @@ public class PropertyKeyAPI extends API {
                             "$action=property_key_write"})
     @RedirectFilter.RedirectMasterRole
     public String create(@Context GraphManager manager,
+                         @Parameter(description = "The graph space name")
                          @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The graph name")
                          @PathParam("graph") String graph,
                          JsonPropertyKey jsonPropertyKey) {
         LOG.debug("Graph [{}] create property key: {}", graph, jsonPropertyKey);
@@ -100,9 +104,15 @@ public class PropertyKeyAPI extends API {
                             "$action=property_key_write"})
     @RedirectFilter.RedirectMasterRole
     public String update(@Context GraphManager manager,
+                         @Parameter(description = "The graph space name")
                          @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The graph name")
                          @PathParam("graph") String graph,
+                         @Parameter(description = "The property key name")
                          @PathParam("name") String name,
+                         @Parameter(description = "Action to perform: 'append' to add new properties, " +
+                                                  "'remove' to delete existing properties, " +
+                                                  "'clear' to clear OLAP property data")
                          @QueryParam("action") String action,
                          PropertyKeyAPI.JsonPropertyKey jsonPropertyKey) {
         LOG.debug("Graph [{}] {} property key: {}",
@@ -142,8 +152,11 @@ public class PropertyKeyAPI extends API {
     @RolesAllowed({"space_member", "$graphspace=$graphspace $owner=$graph " +
                             "$action=property_key_read"})
     public String list(@Context GraphManager manager,
+                       @Parameter(description = "The graph space name")
                        @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The graph name")
                        @PathParam("graph") String graph,
+                       @Parameter(description = "Filter property keys by names")
                        @QueryParam("names") List<String> names) {
         boolean listAll = CollectionUtils.isEmpty(names);
         if (listAll) {
@@ -192,8 +205,11 @@ public class PropertyKeyAPI extends API {
                             "$action=property_key_delete"})
     @RedirectFilter.RedirectMasterRole
     public Map<String, Id> delete(@Context GraphManager manager,
+                                  @Parameter(description = "The graph space name")
                                   @PathParam("graphspace") String graphSpace,
+                                  @Parameter(description = "The graph name")
                                   @PathParam("graph") String graph,
+                                  @Parameter(description = "The property key name to delete")
                                   @PathParam("name") String name) {
         LOG.debug("Graph [{}] remove property key by name '{}'", graph, name);
 
@@ -208,24 +224,36 @@ public class PropertyKeyAPI extends API {
      * JsonPropertyKey is only used to receive create and append requests
      */
     @JsonIgnoreProperties(value = {"status"})
+    @Schema(description = "Property key creation/update request")
     private static class JsonPropertyKey implements Checkable {
 
+        @Schema(description = "The property key ID (only used in RESTORING mode)")
         @JsonProperty("id")
         public long id;
+        @Schema(description = "The property key name", required = true)
         @JsonProperty("name")
         public String name;
+        @Schema(description = "The cardinality: SINGLE, LIST, or SET")
         @JsonProperty("cardinality")
         public Cardinality cardinality;
+        @Schema(description = "The data type: STRING, TEXT, INT, LONG, FLOAT, " +
+                               "DOUBLE, BLOB, BOOLEAN, DATE, UUID")
         @JsonProperty("data_type")
         public DataType dataType;
+        @Schema(description = "The aggregate type: NONE, SUM, MAX, MIN, SUB, " +
+                               "SET, INC, BIGDECIMAL")
         @JsonProperty("aggregate_type")
         public AggregateType aggregateType;
+        @Schema(description = "The write type: OLTP, OLAP, IMMUTABLE")
         @JsonProperty("write_type")
         public WriteType writeType;
+        @Schema(description = "Parent property keys for meta property")
         @JsonProperty("properties")
         public String[] properties;
+        @Schema(description = "User-defined metadata")
         @JsonProperty("user_data")
         public Userdata userdata;
+        @Schema(description = "Whether to check if property key exists before creation")
         @JsonProperty("check_exist")
         public Boolean checkExist;
 

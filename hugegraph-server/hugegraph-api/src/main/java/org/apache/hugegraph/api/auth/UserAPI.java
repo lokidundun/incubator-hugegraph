@@ -37,6 +37,8 @@ import com.codahale.metrics.annotation.Timed;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.inject.Singleton;
 import jakarta.ws.rs.Consumes;
@@ -64,7 +66,7 @@ public class UserAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String create(@Context GraphManager manager,
-                         @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
                          JsonUser jsonUser) {
         LOG.debug("GraphSpace [{}] create user: {}", graphSpace, jsonUser);
         checkCreatingBody(jsonUser);
@@ -80,8 +82,8 @@ public class UserAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String update(@Context GraphManager manager,
-                         @PathParam("graphspace") String graphSpace,
-                         @PathParam("id") String id,
+                         @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                         @Parameter(description = "The user id") @PathParam("id") String id,
                          JsonUser jsonUser) {
         LOG.debug("GraphSpace [{}] update user: {}", graphSpace, jsonUser);
         checkUpdatingBody(jsonUser);
@@ -101,8 +103,8 @@ public class UserAPI extends API {
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String list(@Context GraphManager manager,
-                       @PathParam("graphspace") String graphSpace,
-                       @QueryParam("limit") @DefaultValue("100") long limit) {
+                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The limit of results to return") @QueryParam("limit") @DefaultValue("100") long limit) {
         LOG.debug("GraphSpace [{}] list users", graphSpace);
 
         List<HugeUser> users = manager.authManager().listAllUsers(limit);
@@ -114,8 +116,8 @@ public class UserAPI extends API {
     @Path("{id}")
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String get(@Context GraphManager manager,
-                      @PathParam("graphspace") String graphSpace,
-                      @PathParam("id") String id) {
+                      @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                      @Parameter(description = "The user id") @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] get user: {}", graphSpace, id);
 
         HugeUser user = manager.authManager().getUser(IdGenerator.of(id));
@@ -127,8 +129,8 @@ public class UserAPI extends API {
     @Path("{id}/role")
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     public String role(@Context GraphManager manager,
-                       @PathParam("graphspace") String graphSpace,
-                       @PathParam("id") String id) {
+                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The user id") @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] get user role: {}", graphSpace, id);
 
         HugeUser user = manager.authManager().getUser(IdGenerator.of(id));
@@ -140,8 +142,8 @@ public class UserAPI extends API {
     @Path("{id}")
     @Consumes(APPLICATION_JSON)
     public void delete(@Context GraphManager manager,
-                       @PathParam("graphspace") String graphSpace,
-                       @PathParam("id") String id) {
+                       @Parameter(description = "The graph space name") @PathParam("graphspace") String graphSpace,
+                       @Parameter(description = "The user id") @PathParam("id") String id) {
         LOG.debug("GraphSpace [{}] delete user: {}", graphSpace, id);
 
         try {
@@ -160,16 +162,22 @@ public class UserAPI extends API {
     private static class JsonUser implements Checkable {
 
         @JsonProperty("user_name")
+        @Schema(description = "The user name", required = true)
         private String name;
         @JsonProperty("user_password")
+        @Schema(description = "The user password", required = true)
         private String password;
         @JsonProperty("user_phone")
+        @Schema(description = "The user phone number")
         private String phone;
         @JsonProperty("user_email")
+        @Schema(description = "The user email address")
         private String email;
         @JsonProperty("user_avatar")
+        @Schema(description = "The user avatar URL")
         private String avatar;
         @JsonProperty("user_description")
+        @Schema(description = "The user description")
         private String description;
 
         public HugeUser build(HugeUser user) {

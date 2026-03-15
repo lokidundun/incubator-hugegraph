@@ -77,7 +77,7 @@ public class PropertyKeyAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     @RolesAllowed({"space_member", "$graphspace=$graphspace $owner=$graph " +
-                            "$action=property_key_write"})
+                                   "$action=property_key_write"})
     @RedirectFilter.RedirectMasterRole
     public String create(@Context GraphManager manager,
                          @Parameter(description = "The graph space name")
@@ -101,7 +101,7 @@ public class PropertyKeyAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     @RolesAllowed({"space_member", "$graphspace=$graphspace $owner=$graph " +
-                            "$action=property_key_write"})
+                                   "$action=property_key_write"})
     @RedirectFilter.RedirectMasterRole
     public String update(@Context GraphManager manager,
                          @Parameter(description = "The graph space name")
@@ -110,9 +110,11 @@ public class PropertyKeyAPI extends API {
                          @PathParam("graph") String graph,
                          @Parameter(description = "The property key name")
                          @PathParam("name") String name,
-                         @Parameter(description = "Action to perform: 'append' to add new properties, " +
-                                                  "'remove' to delete existing properties, " +
-                                                  "'clear' to clear OLAP property data")
+                         @Parameter(
+                                 description =
+                                         "Action to perform: 'append' to add new properties, " +
+                                         "'remove' to delete existing properties, " +
+                                         "'clear' to clear OLAP property data")
                          @QueryParam("action") String action,
                          PropertyKeyAPI.JsonPropertyKey jsonPropertyKey) {
         LOG.debug("Graph [{}] {} property key: {}",
@@ -150,7 +152,7 @@ public class PropertyKeyAPI extends API {
     @Timed
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     @RolesAllowed({"space_member", "$graphspace=$graphspace $owner=$graph " +
-                            "$action=property_key_read"})
+                                   "$action=property_key_read"})
     public String list(@Context GraphManager manager,
                        @Parameter(description = "The graph space name")
                        @PathParam("graphspace") String graphSpace,
@@ -183,7 +185,7 @@ public class PropertyKeyAPI extends API {
     @Path("{name}")
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     @RolesAllowed({"space_member", "$graphspace=$graphspace $owner=$graph " +
-                            "$action=property_key_read"})
+                                   "$action=property_key_read"})
     public String get(@Context GraphManager manager,
                       @PathParam("graphspace") String graphSpace,
                       @PathParam("graph") String graph,
@@ -202,7 +204,7 @@ public class PropertyKeyAPI extends API {
     @Consumes(APPLICATION_JSON)
     @Produces(APPLICATION_JSON_WITH_CHARSET)
     @RolesAllowed({"space_member", "$graphspace=$graphspace $owner=$graph " +
-                            "$action=property_key_delete"})
+                                   "$action=property_key_delete"})
     @RedirectFilter.RedirectMasterRole
     public Map<String, Id> delete(@Context GraphManager manager,
                                   @Parameter(description = "The graph space name")
@@ -237,11 +239,11 @@ public class PropertyKeyAPI extends API {
         @JsonProperty("cardinality")
         public Cardinality cardinality;
         @Schema(description = "The data type: STRING, TEXT, INT, LONG, FLOAT, " +
-                               "DOUBLE, BLOB, BOOLEAN, DATE, UUID")
+                              "DOUBLE, BLOB, BOOLEAN, DATE, UUID")
         @JsonProperty("data_type")
         public DataType dataType;
         @Schema(description = "The aggregate type: NONE, SUM, MAX, MIN, SUB, " +
-                               "SET, INC, BIGDECIMAL")
+                              "SET, INC, BIGDECIMAL")
         @JsonProperty("aggregate_type")
         public AggregateType aggregateType;
         @Schema(description = "The write type: OLTP, OLAP, IMMUTABLE")

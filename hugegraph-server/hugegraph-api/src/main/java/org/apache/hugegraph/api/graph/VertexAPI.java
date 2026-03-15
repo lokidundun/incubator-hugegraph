@@ -203,8 +203,9 @@ public class VertexAPI extends BatchAPI {
                          @PathParam("graph") String graph,
                          @Parameter(description = "The vertex ID")
                          @PathParam("id") String idValue,
-                         @Parameter(description = "Action to perform: 'append' to add new properties, " +
-                                                  "'remove' to delete existing properties")
+                         @Parameter(description =
+                                 "Action to perform: 'append' to add new properties, " +
+                                 "'remove' to delete existing properties")
                          @QueryParam("action") String action,
                          JsonVertex jsonVertex) {
         LOG.debug("Graph [{}] update vertex: {}", graph, jsonVertex);
@@ -245,10 +246,11 @@ public class VertexAPI extends BatchAPI {
                        @Parameter(description = "Filter by vertex label")
                        @QueryParam("label") String label,
                        @Parameter(description = "Filter by vertex properties in JSON format, " +
-                                                "e.g., {\"key1\": \"value1\", \"key2\": \"value2\"}")
+                                                "e.g., {\"key\":\"value\"}")
                        @QueryParam("properties") String properties,
-                       @Parameter(description = "Keep the starting predicate P (like P.gt(), P.lt()) " +
-                                                "in property query or parse it to relational operators")
+                       @Parameter(description =
+                               "Keep the starting predicate P (like P.gt(), P.lt()) " +
+                               "in property query or parse it to relational operators")
                        @QueryParam("keep_start_p")
                        @DefaultValue("false") boolean keepStartP,
                        @Parameter(description = "Offset for pagination")

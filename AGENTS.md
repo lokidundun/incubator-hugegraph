@@ -13,6 +13,11 @@ Apache HugeGraph is a fast-speed and highly-scalable graph database that support
 - gRPC for distributed communication
 - RocksDB as default storage backend
 
+## Repo Memory
+
+Repo-level memory and cross-repo adaptation notes live in `docs/llm/`.
+Start at `docs/llm/README.md` for the index and maintenance rules.
+
 ## Architecture
 
 ### Multi-Module Structure

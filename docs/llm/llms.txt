@@ -1,0 +1,85 @@
+# HugeGraph Documentation Map
+> Machine-readable index for LLM ingestion and contributor onboarding.
+> Inspired by Gbrain's llms.txt pattern.
+
+## Project Overview
+Apache HugeGraph is a fast-speed and highly-scalable graph database supporting
+billions of vertices and edges. Compliant with Apache TinkerPop 3, supports
+Gremlin and Cypher query languages.
+
+- Language: Java 11+
+- Build: Apache Maven 3.5+
+- Graph Framework: Apache TinkerPop 3.5.1
+- Default Backend: RocksDB
+- Version: 1.7.0
+
+## Core Docs
+- [README](/README.md): Project overview and quick start
+- [Building Guide](/BUILDING.md): Prerequisites, build commands
+- [Contribution Guide](/CONTRIBUTING.md): How to contribute
+- [AI Agent Guide](/AGENTS.md): Instructions for AI coding tools
+
+## Repo Memory (docs/llm/)
+- [Code Graph](/docs/llm/code-graph.md): Module dependency graph, interface map, data flow
+- [Repo Adaptation](/docs/llm/repo-adaptation.md): Module boundaries, navigation hints
+- [Opsx / OpenSpec](/docs/llm/opsx-openspec.md): Operational conventions, config specs
+- [Onboarding](/docs/llm/onboarding.md): New contributor guide
+
+## Module-Level Guides (AGENTS.md)
+- [Root AGENTS](/AGENTS.md): Multi-module structure, build commands, architecture
+- [Server AGENTS](/hugegraph-server/AGENTS.md): Graph engine, REST APIs, backends
+- [PD AGENTS](/hugegraph-pd/AGENTS.md): Placement Driver, Raft, gRPC services
+- [Store AGENTS](/hugegraph-store/AGENTS.md): Distributed storage, RocksDB + Raft
+- [Commons AGENTS](/hugegraph-commons/AGENTS.md): Shared utilities, RPC framework
+- [Struct AGENTS](/hugegraph-struct/AGENTS.md): Data structure definitions
+
+## Key Source Paths
+- Graph engine: hugegraph-server/hugegraph-core/src/main/java/org/apache/hugegraph/
+- REST APIs: hugegraph-server/hugegraph-api/src/main/java/org/apache/hugegraph/api/
+- PD core: hugegraph-pd/hg-pd-core/src/main/java/org/apache/hugegraph/pd/
+- Store core: hugegraph-store/hg-store-core/src/main/java/org/apache/hugegraph/store/
+- PD protos: hugegraph-pd/hg-pd-grpc/src/main/proto/
+- Store protos: hugegraph-store/hg-store-grpc/src/main/proto/
+
+## Configuration Files
+- Server: hugegraph-server/hugegraph-dist/src/assembly/static/conf/
+  - hugegraph.properties (main server config)
+  - rest-server.properties (REST API settings)
+  - gremlin-server.yaml (Gremlin server)
+- PD: hugegraph-pd/hg-pd-dist/src/assembly/static/conf/application.yml
+- Store: hugegraph-store/hg-store-dist/src/assembly/static/conf/application.yml
+
+## Build & Test Quick Reference
+```bash
+# Full build
+mvn clean install -DskipTests
+
+# Server tests (memory backend)
+mvn test -pl hugegraph-server/hugegraph-test -am -P unit-test
+
+# Server tests (RocksDB backend)
+mvn test -pl hugegraph-server/hugegraph-test -am -P core-test,rocksdb
+
+# PD tests (build struct first)
+mvn install -pl hugegraph-struct -am -DskipTests
+mvn test -pl hugegraph-pd/hg-pd-test -am
+
+# Store tests
+mvn test -pl hugegraph-store/hg-store-test -am
+```
+
+## Ecosystem Repositories
+- hugegraph-toolchain: Loader, Hubble, Client SDK, Tools
+- hugegraph-ai: LLM integration, Knowledge Graph, Graph RAG, Memory System
+- hugegraph-computer: Distributed graph computing (OLAP)
+- hugegraph-doc: Official documentation and website
+
+## Memory System
+The HugeGraph-AI Memory System (hugegraph-llm) enables registering code
+repositories as knowledge graphs in HugeGraph, with incremental updates
+and cross-repository RAG queries.
+
+- Register: POST /memory/register
+- Update: POST /memory/update (incremental)
+- Query: POST /memory/query (cross-repo RAG)
+- See: hugegraph-ai/hugegraph-llm/docs/memory-system-design.md

@@ -16,7 +16,7 @@
 
 ---
 
-**Quick Navigation:** [Architecture](#architecture) • [Quick Start](#quick-start) • [Module Map](#module-map) • [Ecosystem](#ecosystem) • [For Contributors](#for-contributors) • [Community](#community)
+**Quick Navigation:** [Architecture](#architecture) • [Quick Start](#quick-start) • [Module Map](#module-map) • [Ecosystem](#ecosystem) • [For Contributors](#for-contributors) • [Repo Memory](#repo-memory) • [Community](#community)
 
 ---
 
@@ -114,59 +114,10 @@ HugeGraph supports both **standalone** and **distributed** deployments:
 | [hugegraph-store](hugegraph-store) | Distributed storage with Raft consensus for high availability and horizontal scaling |
 | [hugegraph-commons](hugegraph-commons) | Shared utilities, RPC framework and common components |
 
-<details>
-<summary><b>📊 Click to view detailed architecture diagram (Mermaid)</b></summary>
+## Repo Memory
 
-```mermaid
-flowchart TB
-    subgraph Clients["Client Layer"]
-        GC[Gremlin Console]
-        REST[REST Client]
-        CYPHER[Cypher Client]
-        SDK[SDK/Tools]
-    end
-
-    subgraph Server["HugeGraph Server :8080"]
-        API[REST API<br/>Jersey 3]
-        GS[Gremlin Server<br/>TinkerPop 3.5]
-        CS[Cypher Engine<br/>OpenCypher]
-        CORE[Graph Engine<br/>hugegraph-core]
-
-        API --> CORE
-        GS --> CORE
-        CS --> CORE
-    end
-
-    subgraph Storage["Storage Layer"]
-        subgraph Standalone["Standalone Mode"]
-            ROCKS[(RocksDB<br/>Embedded)]
-        end
-
-        subgraph Distributed["Distributed Mode"]
-            PD[HugeGraph-PD<br/>Raft Cluster<br/>:8620/:8686]
-            STORE[HugeGraph-Store<br/>Raft + RocksDB<br/>:8520]
-            PD <--> STORE
-        end
-
-        subgraph Legacy["Legacy Backends (≤v1.5)"]
-            MYSQL[(MySQL)]
-            PG[(PostgreSQL)]
-            CASS[(Cassandra)]
-            HBASE[(HBase, ≤v1.7)]
-        end
-    end
-
-    Clients --> Server
-    CORE --> ROCKS
-    CORE --> PD
-    CORE -.-> Legacy
-
-    style Server fill:#e1f5ff
-    style Distributed fill:#fff4e1
-    style Standalone fill:#f0f0f0
-```
-
-</details>
+Repo-level memory for maintainers and AI tools lives in `docs/llm/`.
+Start at `docs/llm/README.md` for adaptation rules, opsx/openspec notes, and a code graph index.
 
 ## Quick Start
 

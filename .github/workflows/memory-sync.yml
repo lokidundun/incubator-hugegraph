@@ -1,0 +1,116 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Memory Sync Check
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'hugegraph-server/**'
+      - 'hugegraph-pd/**'
+      - 'hugegraph-store/**'
+      - 'hugegraph-commons/**'
+      - 'hugegraph-struct/**'
+      - 'docs/llm/**'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'hugegraph-server/**'
+      - 'hugegraph-pd/**'
+      - 'hugegraph-store/**'
+      - 'hugegraph-commons/**'
+      - 'hugegraph-struct/**'
+      - 'docs/llm/**'
+
+jobs:
+  memory-drift-check:
+    name: Check Memory Drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Count source files on disk
+        id: count
+        run: |
+          # Count Java source files (skip target/ and generated code)
+          JAVA_COUNT=$(find . -name '*.java' \
+            -not -path '*/target/*' \
+            -not -path '*/.git/*' \
+            -not -path '*/grpc/*' \
+            | wc -l)
+
+          # Count config/docs files tracked by git
+          CONFIG_COUNT=$(git ls-files | grep -E '\.(properties|yaml|yml|xml)$' \
+            | grep -v 'target/' \
+            | grep -v 'pom.xml' \
+            | wc -l)
+
+          # Count docs/llm files
+          LLM_DOCS_COUNT=$(find docs/llm -type f 2>/dev/null | wc -l)
+
+          echo "java_files=${JAVA_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "config_files=${CONFIG_COUNT}" >> "$GITHUB_OUTPUT"
+          echo "llm_docs_files=${LLM_DOCS_COUNT}" >> "$GITHUB_OUTPUT"
+
+          echo "=== Memory Sync Report ==="
+          echo "Java source files : ${JAVA_COUNT}"
+          echo "Config files      : ${CONFIG_COUNT}"
+          echo "docs/llm files    : ${LLM_DOCS_COUNT}"
+
+      - name: Check docs/llm completeness
+        run: |
+          MISSING=""
+
+          # Check required docs/llm files exist
+          for f in README.md code-graph.md repo-adaptation.md opsx-openspec.md llms.txt onboarding.md; do
+            if [ ! -f "docs/llm/${f}" ]; then
+              MISSING="${MISSING} docs/llm/${f}"
+            fi
+          done
+
+          if [ -n "${MISSING}" ]; then
+            echo "::warning::Missing docs/llm files:${MISSING}"
+            echo "::warning::Run the memory maintenance workflow to generate these files."
+          else
+            echo "All required docs/llm files present."
+          fi
+
+      - name: Check AGENTS.md coverage
+        run: |
+          MODULES="hugegraph-server hugegraph-pd hugegraph-store hugegraph-commons hugegraph-struct"
+          MISSING_AGENTS=""
+
+          for mod in ${MODULES}; do
+            if [ -d "${mod}" ] && [ ! -f "${mod}/AGENTS.md" ]; then
+              MISSING_AGENTS="${MISSING_AGENTS} ${mod}/AGENTS.md"
+            fi
+          done
+
+          if [ -n "${MISSING_AGENTS}" ]; then
+            echo "::warning::Missing AGENTS.md in:${MISSING_AGENTS}"
+          else
+            echo "All module AGENTS.md files present."
+          fi
+
+      - name: Summary
+        run: |
+          echo "## Memory Sync Check Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Count |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Java source files | ${{ steps.count.outputs.java_files }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Config files | ${{ steps.count.outputs.config_files }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| docs/llm files | ${{ steps.count.outputs.llm_docs_files }} |" >> "$GITHUB_STEP_SUMMARY"

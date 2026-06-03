@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Git post-commit hook: auto-trigger incremental memory update.
+#
+# Install:
+#   cp scripts/hooks/post-commit-memory .git/hooks/post-commit
+#   chmod +x .git/hooks/post-commit
+#
+# Configuration (environment variables):
+#   MEMORY_API_URL  - HugeGraph-AI Memory API endpoint (default: http://localhost:8000)
+#   MEMORY_REPO_TAG - Repository tag (default: incubator-hugegraph)
+#   MEMORY_DISABLED - Set to "1" to disable the hook temporarily
+
+MEMORY_API="${MEMORY_API_URL:-http://localhost:8000}"
+REPO_TAG="${MEMORY_REPO_TAG:-incubator-hugegraph}"
+
+# Allow disabling the hook without removing it
+if [ "${MEMORY_DISABLED:-0}" = "1" ]; then
+    exit 0
+fi
+
+# Fire-and-forget: run in background so it doesn't block the commit
+(
+    sleep 1
+    curl -sf -X POST "${MEMORY_API}/memory/update" \
+        -H "Content-Type: application/json" \
+        -d "{\"repo_tag\": \"${REPO_TAG}\"}" \
+        > /dev/null 2>&1 || true
+) &

@@ -1,0 +1,1143 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements. See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership. The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied. See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+name: Issue 3179 optional follow-up experiments
+'on':
+  push:
+    branches:
+    - codex/issue-3179-followups
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: issue3179-followups
+  cancel-in-progress: false
+jobs:
+  reference:
+    if: ${{ github.repository == 'lokidundun/incubator-hugegraph' }}
+    uses: ./.github/workflows/issue3179-validation.yml
+    with:
+      source_ref: 6a8e1368ec636e68dbc30317e78b385e28c8e325
+      image_tag: followup-${{ github.run_id }}-${{ github.run_attempt }}-reference
+      cache_channel: followup-${{ github.run_id }}-${{ github.run_attempt }}-reference
+  dist-full:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      SOURCE_SHA: 6a8e1368ec636e68dbc30317e78b385e28c8e325
+      SCOPE: ''
+      CACHE_CHANNEL: followup-${{ github.run_id }}-${{ github.run_attempt }}-dist-full
+    steps:
+    - name: Checkout experiment
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+    - name: Extract pinned source
+      run: |
+        mkdir source
+        git archive 6a8e1368ec636e68dbc30317e78b385e28c8e325 | tar -x -C source
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+      with:
+        version: latest
+    - name: Login to personal GHCR test registry
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Prepare distribution exporter
+      run: |
+        python3 .github/issue3179/prepare.py source distribution
+    - name: Build full Maven distributions
+      run: |
+        set -euo pipefail
+        started=$(date +%s)
+        docker buildx build --file source/Distribution.Dockerfile \
+          --build-arg "MAVEN_ARGS=-Drevision=1.7.0 $SCOPE" \
+          --build-arg "SOURCE_REVISION=$SOURCE_SHA" \
+          --cache-to "type=registry,ref=ghcr.io/lokidundun/issue3179-standalone:shared-$CACHE_CHANNEL,mode=max" \
+          --output type=local,dest=out --progress=plain source 2>&1 | tee maven.log
+        echo "Distribution build/export seconds: $(( $(date +%s) - started ))" | tee timing.txt
+        python3 .github/issue3179/inventory.py record out inventory.json
+        tar -czf distribution.tar.gz -C out .
+    - name: Upload distribution-full
+      uses: actions/upload-artifact@v4
+      with:
+        name: distribution-full
+        path: |-
+          distribution.tar.gz
+          inventory.json
+          timing.txt
+        compression-level: 0
+        retention-days: 7
+        if-no-files-found: error
+    - name: Upload maven-evidence-full
+      uses: actions/upload-artifact@v4
+      with:
+        name: maven-evidence-full
+        path: |-
+          maven.log
+          inventory.json
+          timing.txt
+        compression-level: 0
+        retention-days: 7
+        if-no-files-found: error
+      if: ${{ always() }}
+  dist-scoped:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      SOURCE_SHA: 6a8e1368ec636e68dbc30317e78b385e28c8e325
+      SCOPE: -pl hugegraph-server/hugegraph-dist,hugegraph-pd/hg-pd-dist,hugegraph-store/hg-store-dist -am
+      CACHE_CHANNEL: followup-${{ github.run_id }}-${{ github.run_attempt }}-dist-scoped
+    steps:
+    - name: Checkout experiment
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+    - name: Extract pinned source
+      run: |
+        mkdir source
+        git archive 6a8e1368ec636e68dbc30317e78b385e28c8e325 | tar -x -C source
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+      with:
+        version: latest
+    - name: Login to personal GHCR test registry
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Prepare distribution exporter
+      run: |
+        python3 .github/issue3179/prepare.py source distribution
+    - name: Build scoped Maven distributions
+      run: |
+        set -euo pipefail
+        started=$(date +%s)
+        docker buildx build --file source/Distribution.Dockerfile \
+          --build-arg "MAVEN_ARGS=-Drevision=1.7.0 $SCOPE" \
+          --build-arg "SOURCE_REVISION=$SOURCE_SHA" \
+          --cache-to "type=registry,ref=ghcr.io/lokidundun/issue3179-standalone:shared-$CACHE_CHANNEL,mode=max" \
+          --output type=local,dest=out --progress=plain source 2>&1 | tee maven.log
+        echo "Distribution build/export seconds: $(( $(date +%s) - started ))" | tee timing.txt
+        python3 .github/issue3179/inventory.py record out inventory.json
+        tar -czf distribution.tar.gz -C out .
+    - name: Upload distribution-scoped
+      uses: actions/upload-artifact@v4
+      with:
+        name: distribution-scoped
+        path: |-
+          distribution.tar.gz
+          inventory.json
+          timing.txt
+        compression-level: 0
+        retention-days: 7
+        if-no-files-found: error
+    - name: Upload maven-evidence-scoped
+      uses: actions/upload-artifact@v4
+      with:
+        name: maven-evidence-scoped
+        path: |-
+          maven.log
+          inventory.json
+          timing.txt
+        compression-level: 0
+        retention-days: 7
+        if-no-files-found: error
+      if: ${{ always() }}
+  compare-distributions:
+    needs:
+    - dist-full
+    - dist-scoped
+    runs-on: ubuntu-24.04
+    steps:
+    - &id001
+      name: Checkout experiment
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+    - name: Download distribution-full
+      uses: actions/download-artifact@v4
+      with:
+        name: distribution-full
+        path: full
+    - name: Download distribution-scoped
+      uses: actions/download-artifact@v4
+      with:
+        name: distribution-scoped
+        path: scoped
+    - name: Compare every distribution file and nested JAR content
+      run: |
+        python3 .github/issue3179/inventory.py compare full/inventory.json scoped/inventory.json comparison.json
+    - name: Upload distribution-comparison
+      uses: actions/upload-artifact@v4
+      with:
+        name: distribution-comparison
+        path: comparison.json
+        compression-level: 0
+        retention-days: 7
+        if-no-files-found: error
+      if: ${{ always() }}
+  scoped-publication:
+    needs:
+    - compare-distributions
+    uses: ./.github/workflows/issue3179-validation.yml
+    with:
+      source_ref: 6a8e1368ec636e68dbc30317e78b385e28c8e325
+      image_tag: followup-${{ github.run_id }}-${{ github.run_attempt }}-scoped
+      cache_channel: followup-${{ github.run_id }}-${{ github.run_attempt }}-scoped
+      mvn_args: MAVEN_ARGS=-Drevision=1.7.0 -pl hugegraph-server/hugegraph-dist,hugegraph-pd/hg-pd-dist,hugegraph-store/hg-store-dist
+        -am
+  native-runtime:
+    needs:
+    - dist-full
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - arch: amd64
+          runner: ubuntu-24.04
+        - arch: arm64
+          runner: ubuntu-24.04-arm
+    env:
+      SOURCE_REPOSITORY: lokidundun/incubator-hugegraph
+      SOURCE_SHA: 6a8e1368ec636e68dbc30317e78b385e28c8e325
+      WAIT_TIMEOUT_SEC: '600'
+      VERSION_TAG: followup-${{ github.run_id }}-${{ github.run_attempt }}-native
+      PD_IMAGE: ghcr.io/lokidundun/issue3179-pd:followup-${{ github.run_id }}-${{ github.run_attempt }}-native
+      STORE_IMAGE: ghcr.io/lokidundun/issue3179-store:followup-${{ github.run_id }}-${{ github.run_attempt }}-native
+      HSTORE_IMAGE: ghcr.io/lokidundun/issue3179-server:followup-${{ github.run_id }}-${{ github.run_attempt }}-native
+      STANDALONE_IMAGE: ghcr.io/lokidundun/issue3179-standalone:followup-${{ github.run_id }}-${{ github.run_attempt }}-native
+      ARCH: ${{ matrix.arch }}
+      CACHE_CHANNEL: followup-${{ github.run_id }}-${{ github.run_attempt }}-native-${{ matrix.arch }}
+    steps:
+    - *id001
+    - &id002
+      name: Extract pinned source
+      run: |
+        mkdir source
+        git archive 6a8e1368ec636e68dbc30317e78b385e28c8e325 | tar -x -C source
+    - &id003
+      name: Set up Docker with containerd image store
+      uses: docker/setup-docker-action@v5
+      with:
+        daemon-config: |
+          {
+            "features": {
+              "containerd-snapshotter": true
+            }
+          }
+    - &id004
+      name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+      with:
+        version: latest
+    - &id005
+      name: Login to personal GHCR test registry
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Download distribution-full
+      uses: actions/download-artifact@v4
+      with:
+        name: distribution-full
+        path: distribution
+    - name: Prepare native runtime build
+      run: |
+        set -euo pipefail
+        uname -a
+        case "$ARCH:$(uname -m)" in amd64:x86_64|arm64:aarch64) ;; *) exit 1;; esac
+        mkdir -p source/dist images
+        tar -xzf distribution/distribution.tar.gz -C source/dist
+        python3 .github/issue3179/prepare.py source runtime
+        python3 - <<'PY'
+        import json, os, pathlib
+        targets={}
+        for target, component, path in [('pd','pd','hugegraph-pd/Dockerfile'),
+         ('store','store','hugegraph-store/Dockerfile'),
+         ('server-hstore','server','hugegraph-server/Dockerfile-hstore'),
+         ('server-standalone','standalone','hugegraph-server/Dockerfile')]:
+         targets[target] = dict(context='source',dockerfile=path,
+          platforms=['linux/'+os.environ['ARCH']],
+          tags=['ghcr.io/lokidundun/issue3179-'+component+':'+os.environ['VERSION_TAG']],
+          output=['type=oci,dest=images/'+component+'.tar'],
+          **{'cache-to':['type=registry,ref=ghcr.io/lokidundun/issue3179-'+component+
+            ':buildcache-'+os.environ['CACHE_CHANNEL']+',mode=min']})
+        pathlib.Path('runtime-bake.json').write_text(json.dumps({'target':targets,'group':{'default':{'targets':list(targets)}}}))
+        PY
+    - name: Build native runtime images
+      run: |
+        set -euo pipefail
+        started=$(date +%s)
+        docker buildx bake -f runtime-bake.json --progress=plain 2>&1 | tee runtime-build.log
+        echo "Native runtime build/export seconds: $(( $(date +%s) - started ))" | tee runtime-timing.txt
+        for file in images/*.tar; do docker load -i "$file"; done
+        for image in "$PD_IMAGE" "$STORE_IMAGE" "$HSTORE_IMAGE" "$STANDALONE_IMAGE"; do
+          docker image inspect --platform "linux/$ARCH" "$image" >/dev/null
+        done
+    - name: Start compose stack with local images
+      run: |
+        HUGEGRAPH_ADMIN_PASSWORD="$(openssl rand -hex 16)"
+        echo "::add-mask::$HUGEGRAPH_ADMIN_PASSWORD"
+        echo "HUGEGRAPH_ADMIN_PASSWORD=$HUGEGRAPH_ADMIN_PASSWORD" >> "$GITHUB_ENV"
+        export HUGEGRAPH_ADMIN_PASSWORD
+
+        if [ -f "docker/docker-compose-hstore.yml" ] \
+          && [ -f "docker/docker-compose.dev.yml" ]; then
+          # The current HugeGraph dev file is a thin HStore override. Keep the
+          # base topology in the command so its networks and named volumes are
+          # defined before the override is applied.
+          compose_file="docker/docker-compose-hstore.yml"
+          compose_dev_file="docker/docker-compose.dev.yml"
+        elif [ -f "docker/docker-compose.dev.yml" ]; then
+          # Older source revisions may still ship a self-contained dev file.
+          compose_file="docker/docker-compose.dev.yml"
+          compose_dev_file=""
+        elif [ -f "docker/docker-compose.yml" ]; then
+          compose_file="docker/docker-compose.yml"
+          compose_dev_file=""
+          echo "WARN: docker/docker-compose.dev.yml is unavailable; using legacy docker/docker-compose.yml"
+        else
+          echo "ERROR: no supported compose file found in $SOURCE_REPOSITORY@$SOURCE_SHA"
+          echo "Expected docker/docker-compose-hstore.yml plus docker/docker-compose.dev.yml,"
+          echo "or a self-contained docker/docker-compose.dev.yml or docker/docker-compose.yml."
+          exit 1
+        fi
+        echo "COMPOSE_FILE=$compose_file" >> "$GITHUB_ENV"
+        echo "COMPOSE_DEV_FILE=$compose_dev_file" >> "$GITHUB_ENV"
+
+        cat > /tmp/hg-ci-patch-server-config.sh <<'PATCH_SERVER'
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        set_property() {
+          local file="$1" key="$2" value="$3" escaped
+          escaped=${key//./\.}
+          if grep -qE "^[[:space:]]*${escaped}[[:space:]]*=" "$file"; then
+            sed -E -i "s|^[[:space:]]*${escaped}[[:space:]]*=.*|${key}=${value}|" "$file"
+          else
+            printf '%s=%s\n' "$key" "$value" >> "$file"
+          fi
+        }
+
+        set_yaml_scalar() {
+          local file="$1" key="$2" value="$3"
+          if grep -qE "^[[:space:]]*${key}:" "$file"; then
+            sed -E -i "s|^([[:space:]]*)${key}:.*|\1${key}: ${value}|" "$file"
+          else
+            printf '%s: %s\n' "$key" "$value" >> "$file"
+          fi
+        }
+
+        set_property ./conf/rest-server.properties batch.max_write_threads 4
+        set_property ./conf/rest-server.properties restserver.min_free_memory 32
+        set_yaml_scalar ./conf/gremlin-server.yaml threadPoolWorker 4
+        set_yaml_scalar ./conf/gremlin-server.yaml gremlinPool 4
+
+        echo "Applied CI Server resource configuration"
+        exec ./docker-entrypoint.sh
+        PATCH_SERVER
+        chmod 755 /tmp/hg-ci-patch-server-config.sh
+
+        cat > /tmp/docker-compose.ci.override.yml <<COMPOSE_OVERRIDE
+        services:
+          pd:
+            image: ${PD_IMAGE}
+            container_name: hg-pd
+            pull_policy: never
+            mem_limit: 1024m
+            cpus: 2.0
+            environment:
+              JAVA_OPTS: >-
+                -Xms128m -Xmx128m
+                -XX:ActiveProcessorCount=2
+                -XX:MaxMetaspaceSize=192m
+                -XX:MaxDirectMemorySize=128m
+                -XX:+UseContainerSupport
+                -Dlog4j2.asyncLoggerConfigRingBufferSize=8192
+                -DAsyncLoggerConfig.RingBufferSize=8192
+                -Dthread.pool.grpc.core=8
+                -Dthread.pool.grpc.max=32
+                -Dthread.pool.grpc.queue=512
+                -Djob.interruptableThreadPool.core=1
+                -Djob.interruptableThreadPool.max=8
+                -Djob.interruptableThreadPool.queue=256
+                -Djob.uninterruptibleThreadPool.core=0
+                -Djob.uninterruptibleThreadPool.max=4
+                -Djob.uninterruptibleThreadPool.queue=128
+                -Dpartition.default-shard-count=1
+                -Dpartition.store-max-shard-count=12
+          store:
+            image: ${STORE_IMAGE}
+            container_name: hg-store
+            pull_policy: never
+            mem_limit: 1024m
+            cpus: 2.0
+            environment:
+              JAVA_OPTS: >-
+                -Xms128m -Xmx128m
+                -XX:ActiveProcessorCount=2
+                -XX:MaxMetaspaceSize=192m
+                -XX:MaxDirectMemorySize=128m
+                -XX:+UseContainerSupport
+                -Dlog4j2.asyncLoggerConfigRingBufferSize=8192
+                -DAsyncLoggerConfig.RingBufferSize=8192
+                -Drocksdb.total_memory_size=134217728
+                -Drocksdb.write_buffer_size=2097152
+                -Drocksdb.min_write_buffer_number_to_merge=2
+                -Dthread.pool.grpc.core=8
+                -Dthread.pool.grpc.max=32
+                -Dthread.pool.grpc.queue=512
+                -Dthread.pool.scan.core=4
+                -Dthread.pool.scan.max=16
+                -Dthread.pool.scan.queue=256
+                -Djob.interruptableThreadPool.core=2
+                -Djob.interruptableThreadPool.max=8
+                -Djob.interruptableThreadPool.queue=256
+                -Djob.uninterruptibleThreadPool.core=0
+                -Djob.uninterruptibleThreadPool.max=4
+                -Djob.uninterruptibleThreadPool.queue=128
+                -Dquery.push-down.threads=8
+                -Dquery.push-down.fetch_batch=1000
+                -Dquery.push-down.fetch_timeout=30000
+                -Dquery.push-down.memory_limit_count=10000
+                -Dquery.push-down.index_size_limit_count=10000
+                -Draft.disruptorBufferSize=512
+                -Draft.metrics=false
+                -Draft.maxReplicatorInflightMsgs=32
+                -Draft.maxEntriesSize=64
+                -Draft.maxBodySize=262144
+          server:
+            image: ${HSTORE_IMAGE}
+            container_name: hg-server
+            pull_policy: never
+            mem_limit: 1536m
+            cpus: 4.0
+            entrypoint:
+              - /usr/bin/dumb-init
+              - "--"
+              - /opt/hg-ci/patch-server-config.sh
+            environment:
+              JAVA_OPTS: >-
+                -Xms256m -Xmx384m
+                -XX:ActiveProcessorCount=4
+                -XX:MaxMetaspaceSize=256m
+                -XX:MaxDirectMemorySize=128m
+                -XX:+UseContainerSupport
+                -Dlog4j2.asyncLoggerConfigRingBufferSize=8192
+                -DAsyncLoggerConfig.RingBufferSize=8192
+            volumes:
+              - type: bind
+                source: /tmp/hg-ci-patch-server-config.sh
+                target: /opt/hg-ci/patch-server-config.sh
+                read_only: true
+        COMPOSE_OVERRIDE
+
+        compose_args=(-f "$compose_file")
+        if [ -n "$compose_dev_file" ]; then
+          compose_args+=(-f "$compose_dev_file")
+        fi
+        docker compose \
+          -p hg-ci-precheck \
+          "${compose_args[@]}" \
+          -f /tmp/docker-compose.ci.override.yml \
+          up -d --wait --wait-timeout "$WAIT_TIMEOUT_SEC"
+
+        docker compose -p hg-ci-precheck "${compose_args[@]}" \
+          -f /tmp/docker-compose.ci.override.yml ps
+      working-directory: source
+    - name: Verify CI resource limits
+      run: |
+        set -euo pipefail
+
+        assert_memory_limit() {
+          local container="$1" expected_bytes="$2" actual_bytes
+          actual_bytes="$(docker inspect --format '{{.HostConfig.Memory}}' "$container")"
+          if [ "$actual_bytes" != "$expected_bytes" ]; then
+            echo "Unexpected memory limit for ${container}: expected ${expected_bytes}, got ${actual_bytes}"
+            exit 1
+          fi
+          echo "${container} memory limit: ${actual_bytes} bytes"
+        }
+
+        assert_memory_limit hg-pd 1073741824
+        assert_memory_limit hg-store 1073741824
+        assert_memory_limit hg-server 1610612736
+
+        for container in hg-pd hg-store hg-server; do
+          docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" \
+            | grep '^JAVA_OPTS='
+          docker exec "$container" bash -lc "ps -eo args | grep '[j]ava'"
+        done
+        docker exec hg-server grep -E \
+          '^(batch.max_write_threads|restserver.min_free_memory)=' \
+          /hugegraph-server/conf/rest-server.properties
+        docker exec hg-server grep -E \
+          '^[[:space:]]*(threadPoolWorker|gremlinPool):' \
+          /hugegraph-server/conf/gremlin-server.yaml
+
+        docker stats --no-stream hg-pd hg-store hg-server
+      working-directory: source
+    - name: Verify integration endpoints
+      run: |
+        curl -fsS --connect-timeout 3 --max-time 8 "http://127.0.0.1:8620/v1/health" >/dev/null
+        curl -fsS --connect-timeout 3 --max-time 8 "http://127.0.0.1:8520/v1/health" >/dev/null
+        curl -fsS --connect-timeout 3 --max-time 8 "http://127.0.0.1:8080/versions" >/dev/null
+      working-directory: source
+    - name: Import bundled example graph
+      run: |
+        set -euo pipefail
+
+        docker exec hg-server test -r /hugegraph-server/scripts/example.groovy
+        docker exec hg-server bash -lc \
+          'cd /hugegraph-server && bin/gremlin-console.sh -- -e scripts/example.groovy' \
+          | tee /tmp/hg-ci-example-import.log
+
+        grep -Fq '>>>> query all vertices: size=6' /tmp/hg-ci-example-import.log
+        grep -Fq '>>>> query all edges: size=6' /tmp/hg-ci-example-import.log
+      working-directory: source
+    - name: Verify bundled graph with Gremlin CRUD
+      env:
+        CI_VERTEX_NAME: hg-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      run: |
+        set -euo pipefail
+
+        gremlin_request() {
+          local label="$1" script="$2" payload response_file
+          response_file="/tmp/hg-ci-gremlin-${label}.json"
+          payload="$(
+            jq -nc --arg gremlin "$script" \
+              '{gremlin:$gremlin,bindings:{},language:"gremlin-groovy",aliases:{graph:"DEFAULT-hugegraph",g:"__g_DEFAULT-hugegraph"}}'
+          )"
+          curl --fail-with-body -sS \
+            --compressed \
+            --connect-timeout 3 \
+            --max-time 30 \
+            --user "admin:$HUGEGRAPH_ADMIN_PASSWORD" \
+            -H 'Content-Type: application/json' \
+            --data-binary "$payload" \
+            http://127.0.0.1:8080/gremlin \
+            | tee "$response_file"
+          jq -e '.status.code == 200' "$response_file" >/dev/null
+        }
+
+        baseline_script="[[vertices:g.V().count().next(),edges:g.E().count().next(),names:g.V().values('name').order().toList(),markoCreated:g.V().has('person','name','marko').out('created').values('name').order().toList()]]"
+        gremlin_request baseline "$baseline_script"
+        jq -e '
+          .result.data[0].vertices == 6 and
+          .result.data[0].edges == 6 and
+          .result.data[0].names == ["josh","lop","marko","peter","ripple","vadas"] and
+          .result.data[0].markoCreated == ["lop"]
+        ' /tmp/hg-ci-gremlin-baseline.json >/dev/null
+
+        create_script="ci=graph.addVertex(T.label,'person','name','${CI_VERTEX_NAME}','age',40,'city','CI');marko=g.V().has('person','name','marko').next();marko.addEdge('knows',ci,'date','ci','weight',0.1d);graph.tx().commit();'${CI_VERTEX_NAME}'"
+        gremlin_request create "$create_script"
+        jq -e --arg name "$CI_VERTEX_NAME" '.result.data == [$name]' \
+          /tmp/hg-ci-gremlin-create.json >/dev/null
+
+        read_created_script="[[vertices:g.V().count().next(),edges:g.E().count().next(),matches:g.V().has('person','name','marko').out('knows').has('name','${CI_VERTEX_NAME}').count().next()]]"
+        gremlin_request read-created "$read_created_script"
+        jq -e '
+          .result.data[0].vertices == 7 and
+          .result.data[0].edges == 7 and
+          .result.data[0].matches == 1
+        ' /tmp/hg-ci-gremlin-read-created.json >/dev/null
+
+        update_script="g.V().has('person','name','${CI_VERTEX_NAME}').property('age',41).iterate();graph.tx().commit();g.V().has('person','name','${CI_VERTEX_NAME}').values('age').next()"
+        gremlin_request update "$update_script"
+        jq -e '.result.data == [41]' /tmp/hg-ci-gremlin-update.json >/dev/null
+
+        delete_script="ci=g.V().has('person','name','${CI_VERTEX_NAME}').next();g.V(ci).bothE().drop().iterate();g.V(ci).drop().iterate();graph.tx().commit();[[vertices:g.V().count().next(),edges:g.E().count().next()]]"
+        gremlin_request delete "$delete_script"
+        jq -e '
+          .result.data[0].vertices == 6 and
+          .result.data[0].edges == 6
+        ' /tmp/hg-ci-gremlin-delete.json >/dev/null
+
+        gremlin_request final "$baseline_script"
+        jq -e '
+          .result.data[0].vertices == 6 and
+          .result.data[0].edges == 6 and
+          .result.data[0].names == ["josh","lop","marko","peter","ripple","vadas"]
+        ' /tmp/hg-ci-gremlin-final.json >/dev/null
+
+        docker stats --no-stream hg-pd hg-store hg-server
+      working-directory: source
+    - name: Dump compose logs on failure
+      if: ${{ failure() && true }}
+      run: |
+        if [ -n "${COMPOSE_FILE:-}" ] && [ -f /tmp/docker-compose.ci.override.yml ]; then
+          compose_args=(-f "$COMPOSE_FILE")
+          if [ -n "${COMPOSE_DEV_FILE:-}" ]; then
+            compose_args+=(-f "$COMPOSE_DEV_FILE")
+          fi
+          docker compose -p hg-ci-precheck "${compose_args[@]}" \
+            -f /tmp/docker-compose.ci.override.yml ps || true
+          docker compose -p hg-ci-precheck "${compose_args[@]}" \
+            -f /tmp/docker-compose.ci.override.yml logs --no-color --tail=200 || true
+        else
+          echo "Compose stack was not started; COMPOSE_FILE or CI override is unavailable"
+        fi
+        docker stats --no-stream hg-pd hg-store hg-server || true
+        for container in hg-pd hg-store hg-server; do
+          docker inspect --format '{{json .State.Health}}' "$container" || true
+        done
+        for artifact in /tmp/hg-ci-example-import.log /tmp/hg-ci-gremlin-*.json; do
+          if [ -f "$artifact" ]; then
+            echo "===== ${artifact} ====="
+            cat "$artifact"
+          fi
+        done
+      working-directory: source
+    - name: Stop compose stack
+      if: ${{ always() }}
+      run: |
+        set -euo pipefail
+
+        if [ -n "${COMPOSE_FILE:-}" ] && [ -f /tmp/docker-compose.ci.override.yml ]; then
+          compose_args=(-f "$COMPOSE_FILE")
+          if [ -n "${COMPOSE_DEV_FILE:-}" ]; then
+            compose_args+=(-f "$COMPOSE_DEV_FILE")
+          fi
+          docker compose \
+            -p hg-ci-precheck \
+            "${compose_args[@]}" \
+            -f /tmp/docker-compose.ci.override.yml \
+            down -v --remove-orphans
+        else
+          echo "Compose stack was not started; skipping compose down"
+        fi
+
+        leftover_containers="$(docker ps -aq --filter label=com.docker.compose.project=hg-ci-precheck)"
+        leftover_networks="$(docker network ls -q --filter label=com.docker.compose.project=hg-ci-precheck)"
+        leftover_volumes="$(docker volume ls -q --filter label=com.docker.compose.project=hg-ci-precheck)"
+        if [ -n "$leftover_containers$leftover_networks$leftover_volumes" ]; then
+          echo "Compose cleanup left resources behind"
+          docker ps -a --filter label=com.docker.compose.project=hg-ci-precheck
+          docker network ls --filter label=com.docker.compose.project=hg-ci-precheck
+          docker volume ls --filter label=com.docker.compose.project=hg-ci-precheck
+          exit 1
+        fi
+        echo "Compose cleanup removed all project containers, networks, and volumes"
+      working-directory: source
+    - name: Smoke test standalone Server candidate
+      if: ${{ success() }}
+      run: |
+        set -euo pipefail
+        docker run --pull=never -d --name=hg-ci-standalone -p 18080:8080 "$STANDALONE_IMAGE"
+        for attempt in $(seq 1 30); do
+          if curl -fsS --connect-timeout 3 --max-time 8 http://127.0.0.1:18080/versions >/dev/null; then
+            echo "Standalone candidate is ready after attempt ${attempt}"
+            exit 0
+          fi
+          if ! docker inspect --format '{{.State.Running}}' hg-ci-standalone | grep -qx true; then
+            docker logs hg-ci-standalone
+            exit 1
+          fi
+          sleep 2
+        done
+        docker logs hg-ci-standalone
+        exit 1
+      working-directory: source
+    - name: Cleanup standalone container
+      if: ${{ always() }}
+      run: docker rm -f hg-ci-standalone >/dev/null 2>&1 || true
+      working-directory: source
+    - name: Upload native-images-${{ matrix.arch }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-images-${{ matrix.arch }}
+        path: images/*.tar
+        compression-level: 0
+        retention-days: 7
+        if-no-files-found: error
+    - name: Upload native-evidence-${{ matrix.arch }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-evidence-${{ matrix.arch }}
+        path: |-
+          runtime-build.log
+          runtime-timing.txt
+          /tmp/hg-ci-*.log
+          /tmp/hg-ci-*.json
+        compression-level: 0
+        retention-days: 7
+        if-no-files-found: error
+      if: ${{ always() }}
+  native-publication:
+    needs:
+    - native-runtime
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_REPOSITORY: lokidundun/incubator-hugegraph
+      SOURCE_SHA: 6a8e1368ec636e68dbc30317e78b385e28c8e325
+      WAIT_TIMEOUT_SEC: '600'
+      VERSION_TAG: followup-${{ github.run_id }}-${{ github.run_attempt }}-native
+      PD_IMAGE: ghcr.io/lokidundun/issue3179-pd:followup-${{ github.run_id }}-${{ github.run_attempt }}-native
+      STORE_IMAGE: ghcr.io/lokidundun/issue3179-store:followup-${{ github.run_id }}-${{ github.run_attempt }}-native
+      HSTORE_IMAGE: ghcr.io/lokidundun/issue3179-server:followup-${{ github.run_id }}-${{ github.run_attempt }}-native
+      STANDALONE_IMAGE: ghcr.io/lokidundun/issue3179-standalone:followup-${{ github.run_id }}-${{ github.run_attempt }}-native
+    steps:
+    - *id001
+    - *id002
+    - *id003
+    - *id004
+    - *id005
+    - name: Download native-images-amd64
+      uses: actions/download-artifact@v4
+      with:
+        name: native-images-amd64
+        path: images/amd64
+    - name: Download native-images-arm64
+      uses: actions/download-artifact@v4
+      with:
+        name: native-images-arm64
+        path: images/arm64
+    - name: Merge both tested architectures locally
+      run: |
+        set -euo pipefail
+        started=$(date +%s)
+        python3 .github/issue3179/merge_oci.py merged "$VERSION_TAG"
+        for file in merged/*.tar; do docker load -i "$file"; done
+        echo "Merge and local load seconds: $(( $(date +%s) - started ))" | tee merge-timing.txt
+    - name: Verify locally loaded platform variants
+      run: |
+        set -euo pipefail
+        for image in "$PD_IMAGE" "$STORE_IMAGE" "$HSTORE_IMAGE" "$STANDALONE_IMAGE"; do
+          docker image inspect --platform linux/amd64 "$image" >/dev/null
+          docker image inspect --platform linux/arm64 "$image" >/dev/null
+          echo "Loaded amd64 and arm64 variants: ${image}"
+        done
+    - name: Start compose stack with local images
+      run: |
+        HUGEGRAPH_ADMIN_PASSWORD="$(openssl rand -hex 16)"
+        echo "::add-mask::$HUGEGRAPH_ADMIN_PASSWORD"
+        echo "HUGEGRAPH_ADMIN_PASSWORD=$HUGEGRAPH_ADMIN_PASSWORD" >> "$GITHUB_ENV"
+        export HUGEGRAPH_ADMIN_PASSWORD
+
+        if [ -f "docker/docker-compose-hstore.yml" ] \
+          && [ -f "docker/docker-compose.dev.yml" ]; then
+          # The current HugeGraph dev file is a thin HStore override. Keep the
+          # base topology in the command so its networks and named volumes are
+          # defined before the override is applied.
+          compose_file="docker/docker-compose-hstore.yml"
+          compose_dev_file="docker/docker-compose.dev.yml"
+        elif [ -f "docker/docker-compose.dev.yml" ]; then
+          # Older source revisions may still ship a self-contained dev file.
+          compose_file="docker/docker-compose.dev.yml"
+          compose_dev_file=""
+        elif [ -f "docker/docker-compose.yml" ]; then
+          compose_file="docker/docker-compose.yml"
+          compose_dev_file=""
+          echo "WARN: docker/docker-compose.dev.yml is unavailable; using legacy docker/docker-compose.yml"
+        else
+          echo "ERROR: no supported compose file found in $SOURCE_REPOSITORY@$SOURCE_SHA"
+          echo "Expected docker/docker-compose-hstore.yml plus docker/docker-compose.dev.yml,"
+          echo "or a self-contained docker/docker-compose.dev.yml or docker/docker-compose.yml."
+          exit 1
+        fi
+        echo "COMPOSE_FILE=$compose_file" >> "$GITHUB_ENV"
+        echo "COMPOSE_DEV_FILE=$compose_dev_file" >> "$GITHUB_ENV"
+
+        cat > /tmp/hg-ci-patch-server-config.sh <<'PATCH_SERVER'
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        set_property() {
+          local file="$1" key="$2" value="$3" escaped
+          escaped=${key//./\.}
+          if grep -qE "^[[:space:]]*${escaped}[[:space:]]*=" "$file"; then
+            sed -E -i "s|^[[:space:]]*${escaped}[[:space:]]*=.*|${key}=${value}|" "$file"
+          else
+            printf '%s=%s\n' "$key" "$value" >> "$file"
+          fi
+        }
+
+        set_yaml_scalar() {
+          local file="$1" key="$2" value="$3"
+          if grep -qE "^[[:space:]]*${key}:" "$file"; then
+            sed -E -i "s|^([[:space:]]*)${key}:.*|\1${key}: ${value}|" "$file"
+          else
+            printf '%s: %s\n' "$key" "$value" >> "$file"
+          fi
+        }
+
+        set_property ./conf/rest-server.properties batch.max_write_threads 4
+        set_property ./conf/rest-server.properties restserver.min_free_memory 32
+        set_yaml_scalar ./conf/gremlin-server.yaml threadPoolWorker 4
+        set_yaml_scalar ./conf/gremlin-server.yaml gremlinPool 4
+
+        echo "Applied CI Server resource configuration"
+        exec ./docker-entrypoint.sh
+        PATCH_SERVER
+        chmod 755 /tmp/hg-ci-patch-server-config.sh
+
+        cat > /tmp/docker-compose.ci.override.yml <<COMPOSE_OVERRIDE
+        services:
+          pd:
+            image: ${PD_IMAGE}
+            container_name: hg-pd
+            pull_policy: never
+            mem_limit: 1024m
+            cpus: 2.0
+            environment:
+              JAVA_OPTS: >-
+                -Xms128m -Xmx128m
+                -XX:ActiveProcessorCount=2
+                -XX:MaxMetaspaceSize=192m
+                -XX:MaxDirectMemorySize=128m
+                -XX:+UseContainerSupport
+                -Dlog4j2.asyncLoggerConfigRingBufferSize=8192
+                -DAsyncLoggerConfig.RingBufferSize=8192
+                -Dthread.pool.grpc.core=8
+                -Dthread.pool.grpc.max=32
+                -Dthread.pool.grpc.queue=512
+                -Djob.interruptableThreadPool.core=1
+                -Djob.interruptableThreadPool.max=8
+                -Djob.interruptableThreadPool.queue=256
+                -Djob.uninterruptibleThreadPool.core=0
+                -Djob.uninterruptibleThreadPool.max=4
+                -Djob.uninterruptibleThreadPool.queue=128
+                -Dpartition.default-shard-count=1
+                -Dpartition.store-max-shard-count=12
+          store:
+            image: ${STORE_IMAGE}
+            container_name: hg-store
+            pull_policy: never
+            mem_limit: 1024m
+            cpus: 2.0
+            environment:
+              JAVA_OPTS: >-
+                -Xms128m -Xmx128m
+                -XX:ActiveProcessorCount=2
+                -XX:MaxMetaspaceSize=192m
+                -XX:MaxDirectMemorySize=128m
+                -XX:+UseContainerSupport
+                -Dlog4j2.asyncLoggerConfigRingBufferSize=8192
+                -DAsyncLoggerConfig.RingBufferSize=8192
+                -Drocksdb.total_memory_size=134217728
+                -Drocksdb.write_buffer_size=2097152
+                -Drocksdb.min_write_buffer_number_to_merge=2
+                -Dthread.pool.grpc.core=8
+                -Dthread.pool.grpc.max=32
+                -Dthread.pool.grpc.queue=512
+                -Dthread.pool.scan.core=4
+                -Dthread.pool.scan.max=16
+                -Dthread.pool.scan.queue=256
+                -Djob.interruptableThreadPool.core=2
+                -Djob.interruptableThreadPool.max=8
+                -Djob.interruptableThreadPool.queue=256
+                -Djob.uninterruptibleThreadPool.core=0
+                -Djob.uninterruptibleThreadPool.max=4
+                -Djob.uninterruptibleThreadPool.queue=128
+                -Dquery.push-down.threads=8
+                -Dquery.push-down.fetch_batch=1000
+                -Dquery.push-down.fetch_timeout=30000
+                -Dquery.push-down.memory_limit_count=10000
+                -Dquery.push-down.index_size_limit_count=10000
+                -Draft.disruptorBufferSize=512
+                -Draft.metrics=false
+                -Draft.maxReplicatorInflightMsgs=32
+                -Draft.maxEntriesSize=64
+                -Draft.maxBodySize=262144
+          server:
+            image: ${HSTORE_IMAGE}
+            container_name: hg-server
+            pull_policy: never
+            mem_limit: 1536m
+            cpus: 4.0
+            entrypoint:
+              - /usr/bin/dumb-init
+              - "--"
+              - /opt/hg-ci/patch-server-config.sh
+            environment:
+              JAVA_OPTS: >-
+                -Xms256m -Xmx384m
+                -XX:ActiveProcessorCount=4
+                -XX:MaxMetaspaceSize=256m
+                -XX:MaxDirectMemorySize=128m
+                -XX:+UseContainerSupport
+                -Dlog4j2.asyncLoggerConfigRingBufferSize=8192
+                -DAsyncLoggerConfig.RingBufferSize=8192
+            volumes:
+              - type: bind
+                source: /tmp/hg-ci-patch-server-config.sh
+                target: /opt/hg-ci/patch-server-config.sh
+                read_only: true
+        COMPOSE_OVERRIDE
+
+        compose_args=(-f "$compose_file")
+        if [ -n "$compose_dev_file" ]; then
+          compose_args+=(-f "$compose_dev_file")
+        fi
+        docker compose \
+          -p hg-ci-precheck \
+          "${compose_args[@]}" \
+          -f /tmp/docker-compose.ci.override.yml \
+          up -d --wait --wait-timeout "$WAIT_TIMEOUT_SEC"
+
+        docker compose -p hg-ci-precheck "${compose_args[@]}" \
+          -f /tmp/docker-compose.ci.override.yml ps
+      working-directory: source
+    - name: Verify CI resource limits
+      run: |
+        set -euo pipefail
+
+        assert_memory_limit() {
+          local container="$1" expected_bytes="$2" actual_bytes
+          actual_bytes="$(docker inspect --format '{{.HostConfig.Memory}}' "$container")"
+          if [ "$actual_bytes" != "$expected_bytes" ]; then
+            echo "Unexpected memory limit for ${container}: expected ${expected_bytes}, got ${actual_bytes}"
+            exit 1
+          fi
+          echo "${container} memory limit: ${actual_bytes} bytes"
+        }
+
+        assert_memory_limit hg-pd 1073741824
+        assert_memory_limit hg-store 1073741824
+        assert_memory_limit hg-server 1610612736
+
+        for container in hg-pd hg-store hg-server; do
+          docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" \
+            | grep '^JAVA_OPTS='
+          docker exec "$container" bash -lc "ps -eo args | grep '[j]ava'"
+        done
+        docker exec hg-server grep -E \
+          '^(batch.max_write_threads|restserver.min_free_memory)=' \
+          /hugegraph-server/conf/rest-server.properties
+        docker exec hg-server grep -E \
+          '^[[:space:]]*(threadPoolWorker|gremlinPool):' \
+          /hugegraph-server/conf/gremlin-server.yaml
+
+        docker stats --no-stream hg-pd hg-store hg-server
+      working-directory: source
+    - name: Verify integration endpoints
+      run: |
+        curl -fsS --connect-timeout 3 --max-time 8 "http://127.0.0.1:8620/v1/health" >/dev/null
+        curl -fsS --connect-timeout 3 --max-time 8 "http://127.0.0.1:8520/v1/health" >/dev/null
+        curl -fsS --connect-timeout 3 --max-time 8 "http://127.0.0.1:8080/versions" >/dev/null
+      working-directory: source
+    - name: Import bundled example graph
+      run: |
+        set -euo pipefail
+
+        docker exec hg-server test -r /hugegraph-server/scripts/example.groovy
+        docker exec hg-server bash -lc \
+          'cd /hugegraph-server && bin/gremlin-console.sh -- -e scripts/example.groovy' \
+          | tee /tmp/hg-ci-example-import.log
+
+        grep -Fq '>>>> query all vertices: size=6' /tmp/hg-ci-example-import.log
+        grep -Fq '>>>> query all edges: size=6' /tmp/hg-ci-example-import.log
+      working-directory: source
+    - name: Verify bundled graph with Gremlin CRUD
+      env:
+        CI_VERTEX_NAME: hg-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      run: |
+        set -euo pipefail
+
+        gremlin_request() {
+          local label="$1" script="$2" payload response_file
+          response_file="/tmp/hg-ci-gremlin-${label}.json"
+          payload="$(
+            jq -nc --arg gremlin "$script" \
+              '{gremlin:$gremlin,bindings:{},language:"gremlin-groovy",aliases:{graph:"DEFAULT-hugegraph",g:"__g_DEFAULT-hugegraph"}}'
+          )"
+          curl --fail-with-body -sS \
+            --compressed \
+            --connect-timeout 3 \
+            --max-time 30 \
+            --user "admin:$HUGEGRAPH_ADMIN_PASSWORD" \
+            -H 'Content-Type: application/json' \
+            --data-binary "$payload" \
+            http://127.0.0.1:8080/gremlin \
+            | tee "$response_file"
+          jq -e '.status.code == 200' "$response_file" >/dev/null
+        }
+
+        baseline_script="[[vertices:g.V().count().next(),edges:g.E().count().next(),names:g.V().values('name').order().toList(),markoCreated:g.V().has('person','name','marko').out('created').values('name').order().toList()]]"
+        gremlin_request baseline "$baseline_script"
+        jq -e '
+          .result.data[0].vertices == 6 and
+          .result.data[0].edges == 6 and
+          .result.data[0].names == ["josh","lop","marko","peter","ripple","vadas"] and
+          .result.data[0].markoCreated == ["lop"]
+        ' /tmp/hg-ci-gremlin-baseline.json >/dev/null
+
+        create_script="ci=graph.addVertex(T.label,'person','name','${CI_VERTEX_NAME}','age',40,'city','CI');marko=g.V().has('person','name','marko').next();marko.addEdge('knows',ci,'date','ci','weight',0.1d);graph.tx().commit();'${CI_VERTEX_NAME}'"
+        gremlin_request create "$create_script"
+        jq -e --arg name "$CI_VERTEX_NAME" '.result.data == [$name]' \
+          /tmp/hg-ci-gremlin-create.json >/dev/null
+
+        read_created_script="[[vertices:g.V().count().next(),edges:g.E().count().next(),matches:g.V().has('person','name','marko').out('knows').has('name','${CI_VERTEX_NAME}').count().next()]]"
+        gremlin_request read-created "$read_created_script"
+        jq -e '
+          .result.data[0].vertices == 7 and
+          .result.data[0].edges == 7 and
+          .result.data[0].matches == 1
+        ' /tmp/hg-ci-gremlin-read-created.json >/dev/null
+
+        update_script="g.V().has('person','name','${CI_VERTEX_NAME}').property('age',41).iterate();graph.tx().commit();g.V().has('person','name','${CI_VERTEX_NAME}').values('age').next()"
+        gremlin_request update "$update_script"
+        jq -e '.result.data == [41]' /tmp/hg-ci-gremlin-update.json >/dev/null
+
+        delete_script="ci=g.V().has('person','name','${CI_VERTEX_NAME}').next();g.V(ci).bothE().drop().iterate();g.V(ci).drop().iterate();graph.tx().commit();[[vertices:g.V().count().next(),edges:g.E().count().next()]]"
+        gremlin_request delete "$delete_script"
+        jq -e '
+          .result.data[0].vertices == 6 and
+          .result.data[0].edges == 6
+        ' /tmp/hg-ci-gremlin-delete.json >/dev/null
+
+        gremlin_request final "$baseline_script"
+        jq -e '
+          .result.data[0].vertices == 6 and
+          .result.data[0].edges == 6 and
+          .result.data[0].names == ["josh","lop","marko","peter","ripple","vadas"]
+        ' /tmp/hg-ci-gremlin-final.json >/dev/null
+
+        docker stats --no-stream hg-pd hg-store hg-server
+      working-directory: source
+    - name: Dump compose logs on failure
+      if: ${{ failure() && true }}
+      run: |
+        if [ -n "${COMPOSE_FILE:-}" ] && [ -f /tmp/docker-compose.ci.override.yml ]; then
+          compose_args=(-f "$COMPOSE_FILE")
+          if [ -n "${COMPOSE_DEV_FILE:-}" ]; then
+            compose_args+=(-f "$COMPOSE_DEV_FILE")
+          fi
+          docker compose -p hg-ci-precheck "${compose_args[@]}" \
+            -f /tmp/docker-compose.ci.override.yml ps || true
+          docker compose -p hg-ci-precheck "${compose_args[@]}" \
+            -f /tmp/docker-compose.ci.override.yml logs --no-color --tail=200 || true
+        else
+          echo "Compose stack was not started; COMPOSE_FILE or CI override is unavailable"
+        fi
+        docker stats --no-stream hg-pd hg-store hg-server || true
+        for container in hg-pd hg-store hg-server; do
+          docker inspect --format '{{json .State.Health}}' "$container" || true
+        done
+        for artifact in /tmp/hg-ci-example-import.log /tmp/hg-ci-gremlin-*.json; do
+          if [ -f "$artifact" ]; then
+            echo "===== ${artifact} ====="
+            cat "$artifact"
+          fi
+        done
+      working-directory: source
+    - name: Stop compose stack
+      if: ${{ always() }}
+      run: |
+        set -euo pipefail
+
+        if [ -n "${COMPOSE_FILE:-}" ] && [ -f /tmp/docker-compose.ci.override.yml ]; then
+          compose_args=(-f "$COMPOSE_FILE")
+          if [ -n "${COMPOSE_DEV_FILE:-}" ]; then
+            compose_args+=(-f "$COMPOSE_DEV_FILE")
+          fi
+          docker compose \
+            -p hg-ci-precheck \
+            "${compose_args[@]}" \
+            -f /tmp/docker-compose.ci.override.yml \
+            down -v --remove-orphans
+        else
+          echo "Compose stack was not started; skipping compose down"
+        fi
+
+        leftover_containers="$(docker ps -aq --filter label=com.docker.compose.project=hg-ci-precheck)"
+        leftover_networks="$(docker network ls -q --filter label=com.docker.compose.project=hg-ci-precheck)"
+        leftover_volumes="$(docker volume ls -q --filter label=com.docker.compose.project=hg-ci-precheck)"
+        if [ -n "$leftover_containers$leftover_networks$leftover_volumes" ]; then
+          echo "Compose cleanup left resources behind"
+          docker ps -a --filter label=com.docker.compose.project=hg-ci-precheck
+          docker network ls --filter label=com.docker.compose.project=hg-ci-precheck
+          docker volume ls --filter label=com.docker.compose.project=hg-ci-precheck
+          exit 1
+        fi
+        echo "Compose cleanup removed all project containers, networks, and volumes"
+      working-directory: source
+    - name: Smoke test standalone Server candidate
+      if: ${{ success() }}
+      run: |
+        set -euo pipefail
+        docker run --pull=never -d --name=hg-ci-standalone -p 18080:8080 "$STANDALONE_IMAGE"
+        for attempt in $(seq 1 30); do
+          if curl -fsS --connect-timeout 3 --max-time 8 http://127.0.0.1:18080/versions >/dev/null; then
+            echo "Standalone candidate is ready after attempt ${attempt}"
+            exit 0
+          fi
+          if ! docker inspect --format '{{.State.Running}}' hg-ci-standalone | grep -qx true; then
+            docker logs hg-ci-standalone
+            exit 1
+          fi
+          sleep 2
+        done
+        docker logs hg-ci-standalone
+        exit 1
+      working-directory: source
+    - name: Cleanup standalone container
+      if: ${{ always() }}
+      run: docker rm -f hg-ci-standalone >/dev/null 2>&1 || true
+      working-directory: source
+    - name: Push tested multi-platform candidates
+      if: ${{ success() && true }}
+      run: |
+        set -euo pipefail
+        for image in "$PD_IMAGE" "$STORE_IMAGE" "$HSTORE_IMAGE" "$STANDALONE_IMAGE"; do
+          pushed="false"
+          for attempt in 1 2 3; do
+            echo "Pushing tested multi-platform candidate ${image} (attempt ${attempt}/3)"
+            if docker push "$image"; then
+              pushed="true"
+              break
+            fi
+            sleep $((attempt * 5))
+          done
+          if [ "$pushed" != "true" ]; then
+            echo "Failed to push ${image} after 3 attempts"
+            exit 1
+          fi
+        done
+    - name: Verify published architecture manifests
+      run: |
+        set -euo pipefail
+        for image in "$PD_IMAGE" "$STORE_IMAGE" "$HSTORE_IMAGE" "$STANDALONE_IMAGE"; do
+          docker buildx imagetools inspect --raw "$image" | jq -e '
+            [.manifests[].platform | .os + "/" + .architecture] |
+            index("linux/amd64") != null and index("linux/arm64") != null'
+        done
+    - name: Upload native-merge-evidence
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-merge-evidence
+        path: |-
+          merge-timing.txt
+          /tmp/hg-ci-*.json
+          /tmp/hg-ci-*.log
+        compression-level: 0
+        retention-days: 7
+        if-no-files-found: error
+      if: ${{ always() }}

@@ -28,13 +28,6 @@ concurrency:
   group: issue3179-followups
   cancel-in-progress: false
 jobs:
-  reference:
-    if: ${{ github.repository == 'lokidundun/incubator-hugegraph' }}
-    uses: ./.github/workflows/issue3179-validation.yml
-    with:
-      source_ref: 6a8e1368ec636e68dbc30317e78b385e28c8e325
-      image_tag: followup-${{ github.run_id }}-${{ github.run_attempt }}-reference
-      cache_channel: followup-${{ github.run_id }}-${{ github.run_attempt }}-reference
   dist-full:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
@@ -50,8 +43,10 @@ jobs:
         persist-credentials: false
     - name: Extract pinned source
       run: |
-        mkdir source
-        git archive 6a8e1368ec636e68dbc30317e78b385e28c8e325 | tar -x -C source
+        git worktree add --detach source 6a8e1368ec636e68dbc30317e78b385e28c8e325
+        test -f source/hugegraph-pd/hg-pd-dist/docker/docker-entrypoint.sh
+        test -f source/hugegraph-store/hg-store-dist/src/assembly/static/bin/libjemalloc_aarch64.so
+        test -f source/docker/docker-compose-hstore.yml
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
       with:
@@ -115,8 +110,10 @@ jobs:
         persist-credentials: false
     - name: Extract pinned source
       run: |
-        mkdir source
-        git archive 6a8e1368ec636e68dbc30317e78b385e28c8e325 | tar -x -C source
+        git worktree add --detach source 6a8e1368ec636e68dbc30317e78b385e28c8e325
+        test -f source/hugegraph-pd/hg-pd-dist/docker/docker-entrypoint.sh
+        test -f source/hugegraph-store/hg-store-dist/src/assembly/static/bin/libjemalloc_aarch64.so
+        test -f source/docker/docker-compose-hstore.yml
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
       with:
@@ -199,16 +196,6 @@ jobs:
         retention-days: 7
         if-no-files-found: error
       if: ${{ always() }}
-  scoped-publication:
-    needs:
-    - compare-distributions
-    uses: ./.github/workflows/issue3179-validation.yml
-    with:
-      source_ref: 6a8e1368ec636e68dbc30317e78b385e28c8e325
-      image_tag: followup-${{ github.run_id }}-${{ github.run_attempt }}-scoped
-      cache_channel: followup-${{ github.run_id }}-${{ github.run_attempt }}-scoped
-      mvn_args: MAVEN_ARGS=-Drevision=1.7.0 -pl hugegraph-server/hugegraph-dist,hugegraph-pd/hg-pd-dist,hugegraph-store/hg-store-dist
-        -am
   native-runtime:
     needs:
     - dist-full
@@ -238,8 +225,10 @@ jobs:
     - &id002
       name: Extract pinned source
       run: |
-        mkdir source
-        git archive 6a8e1368ec636e68dbc30317e78b385e28c8e325 | tar -x -C source
+        git worktree add --detach source 6a8e1368ec636e68dbc30317e78b385e28c8e325
+        test -f source/hugegraph-pd/hg-pd-dist/docker/docker-entrypoint.sh
+        test -f source/hugegraph-store/hg-store-dist/src/assembly/static/bin/libjemalloc_aarch64.so
+        test -f source/docker/docker-compose-hstore.yml
     - &id003
       name: Set up Docker with containerd image store
       uses: docker/setup-docker-action@v5

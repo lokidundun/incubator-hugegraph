@@ -1,0 +1,829 @@
+# Fork-only validation harness adapted from hugegraph/actions.
+name: Issue 3179 multiarch validation (fork only)
+'on':
+  workflow_call:
+    inputs:
+      source_repository:
+        type: string
+        default: lokidundun/incubator-hugegraph
+      source_ref:
+        type: string
+        required: true
+      image_tag:
+        type: string
+        required: true
+      cache_channel:
+        type: string
+        required: true
+      mvn_args:
+        type: string
+        default: MAVEN_ARGS=-Drevision=1.7.0
+      strict_mode:
+        type: boolean
+        default: true
+      wait_timeout_sec:
+        type: string
+        default: '600'
+      artifact_revision:
+        type: string
+        default: ''
+permissions:
+  contents: read
+  packages: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REPOSITORY: ${{ inputs.source_repository }}
+      SOURCE_SHA: ${{ inputs.source_ref }}
+      MVN_ARGS: ${{ inputs.mvn_args }}
+      WAIT_TIMEOUT_SEC: ${{ inputs.wait_timeout_sec }}
+      VERSION_TAG: ${{ inputs.image_tag }}
+      CACHE_CHANNEL: ${{ inputs.cache_channel }}
+      PUBLISH_IMAGES: 'true'
+      PD_IMAGE: ghcr.io/lokidundun/issue3179-pd:${{ inputs.image_tag }}
+      STORE_IMAGE: ghcr.io/lokidundun/issue3179-store:${{ inputs.image_tag }}
+      HSTORE_IMAGE: ghcr.io/lokidundun/issue3179-server:${{ inputs.image_tag }}
+      STANDALONE_IMAGE: ghcr.io/lokidundun/issue3179-standalone:${{ inputs.image_tag }}
+    steps:
+    - name: Record benchmark start
+      run: |
+        echo "BENCHMARK_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+        uname -a
+        df -h
+    - name: Validate wait timeout
+      run: |
+        if ! [[ "$WAIT_TIMEOUT_SEC" =~ ^[0-9]+$ ]] || [ "$WAIT_TIMEOUT_SEC" -lt 30 ] || [ "$WAIT_TIMEOUT_SEC" -gt 1800 ]; then
+          echo "Invalid wait_timeout_sec: $WAIT_TIMEOUT_SEC. Expected integer between 30 and 1800."
+          exit 1
+        fi
+    - name: Checkout source
+      uses: actions/checkout@v7
+      with:
+        repository: ${{ env.SOURCE_REPOSITORY }}
+        ref: ${{ env.SOURCE_SHA }}
+        fetch-depth: 2
+        persist-credentials: false
+    - name: Apply identical harmless distribution config change
+      if: ${{ inputs.artifact_revision != '' }}
+      env:
+        ARTIFACT_REVISION: ${{ inputs.artifact_revision }}
+      run: |
+        python3 - <<'PY'
+        from pathlib import Path
+        import os
+        paths = [
+         'hugegraph-pd/hg-pd-dist/src/assembly/static/conf/application.yml',
+         'hugegraph-store/hg-store-dist/src/assembly/static/conf/application.yml',
+         'hugegraph-server/hugegraph-dist/src/assembly/static/conf/rest-server.properties',
+        ]
+        revision = os.environ['ARTIFACT_REVISION']
+        assert revision == 'changed'
+        for name in paths:
+            p = Path(name)
+            p.write_text(p.read_text() + '\n# issue3179 benchmark revision: ' + revision + '\n')
+        PY
+    - name: Route image tags and caches to personal test registry
+      run: |
+        python3 - <<'PY'
+        from pathlib import Path
+        p = Path('docker/bake.hcl')
+        s = p.read_text()
+        s = s.replace('hugegraph/pd', 'ghcr.io/lokidundun/issue3179-pd')
+        s = s.replace('hugegraph/store', 'ghcr.io/lokidundun/issue3179-store')
+        s = s.replace('hugegraph/server', 'ghcr.io/lokidundun/issue3179-server')
+        s = s.replace('hugegraph/hugegraph', 'ghcr.io/lokidundun/issue3179-standalone')
+        p.write_text(s)
+        PY
+    - name: Check Dockerfiles and shared build stages
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        from pathlib import Path
+        paths = ['hugegraph-pd/Dockerfile','hugegraph-store/Dockerfile','hugegraph-server/Dockerfile','hugegraph-server/Dockerfile-hstore']
+        stages = []
+        for name in paths:
+            text = Path(name).read_text()
+            stages.append(text[text.index('FROM --platform='):text.index('FROM eclipse-temurin:')])
+        assert all(stage == stages[0] for stage in stages)
+        PY
+        bash hugegraph-server/hugegraph-dist/docker/test/test-docker-entrypoint.sh
+    - name: Set up Docker with containerd image store
+      uses: docker/setup-docker-action@v5
+      with:
+        daemon-config: |
+          {
+            "features": {
+              "containerd-snapshotter": true
+            }
+          }
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v4
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v4
+      with:
+        version: latest
+    - name: Validate source-provided Bake graph
+      if: ${{ hashFiles('docker/bake.hcl') != '' }}
+      env:
+        IMAGE_TAG: ${{ inputs.image_tag }}
+        SOURCE_REVISION: ${{ inputs.source_ref }}
+        EXPORT_CACHE: 'true'
+      run: |
+        set -euo pipefail
+
+        bake_print_command=(
+          docker buildx bake
+          --file docker/bake.hcl
+          --print
+        )
+        expected_build_args='{"MAVEN_ARGS":""}'
+        while IFS= read -r build_arg; do
+          if [ -z "$build_arg" ]; then
+            continue
+          fi
+          build_arg_name="${build_arg%%=*}"
+          if [ "$build_arg_name" = "$build_arg" ] \
+            || ! [[ "$build_arg_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            echo "Invalid mvn_args entry; expected one NAME=VALUE build argument per line"
+            exit 1
+          fi
+          if [ "$build_arg_name" = "SOURCE_REVISION" ]; then
+            echo "mvn_args must not override reserved build argument SOURCE_REVISION"
+            exit 1
+          fi
+          bake_print_command+=(
+            --set "*.args.${build_arg_name}=${build_arg#*=}"
+          )
+          expected_build_args="$(
+            jq -cn \
+              --argjson current "$expected_build_args" \
+              --arg name "$build_arg_name" \
+              --arg value "${build_arg#*=}" \
+              'def bake_print_value:
+                gsub("\\$\\{"; "$${") | gsub("%\\{"; "%%{");
+              $current + {($name): ($value | bake_print_value)}'
+          )"
+        done <<< "$MVN_ARGS"
+
+        "${bake_print_command[@]}" > /tmp/hugegraph-bake.json
+        jq -e \
+          --arg source_revision "$SOURCE_REVISION" \
+          --arg image_tag "$VERSION_TAG" \
+          --arg cache_channel "$CACHE_CHANNEL" \
+          --argjson expected_build_args "$expected_build_args" \
+          --argjson export_cache "$EXPORT_CACHE" '
+          def registry_cache($ref): {ref: $ref, type: "registry"};
+          def runtime_target($dockerfile; $tag; $legacy_cache):
+            .context == "." and
+            .dockerfile == $dockerfile and
+            .tags == [$tag] and
+            .platforms == ["linux/amd64", "linux/arm64"] and
+            .output == [{type: "docker"}] and
+            .["cache-from"] == [
+              registry_cache("ghcr.io/lokidundun/issue3179-standalone:shared-" + $cache_channel),
+              registry_cache($legacy_cache + $cache_channel)
+            ] and
+            ((.["cache-to"] // []) == (if $export_cache then [
+              {
+                mode: "min",
+                ref: ($legacy_cache + $cache_channel),
+                type: "registry"
+              }
+            ] else [] end)) and
+            .args == ($expected_build_args + {
+              SOURCE_REVISION: $source_revision
+            }) and
+            ((keys - [
+              "args", "cache-from", "cache-to", "context", "dockerfile",
+              "output", "platforms", "tags"
+            ]) == []);
+
+          .group.default.targets == [
+            "build-cache", "pd", "server-hstore", "server-standalone", "store"
+          ] and
+          (.target | keys) == [
+            "build-cache", "pd", "server-hstore", "server-standalone", "store"
+          ] and
+          (.target["build-cache"] |
+            .context == "." and
+            .dockerfile == "hugegraph-pd/Dockerfile" and
+            .target == "build" and
+            .platforms == ["linux/amd64", "linux/arm64"] and
+            .output == [{type: "cacheonly"}] and
+            .["cache-from"] == [
+              registry_cache("ghcr.io/lokidundun/issue3179-standalone:shared-" + $cache_channel),
+              registry_cache("ghcr.io/lokidundun/issue3179-pd:buildcache-" + $cache_channel)
+            ] and
+            ((.["cache-to"] // []) == (if $export_cache then [
+              {
+                mode: "max",
+                ref: ("ghcr.io/lokidundun/issue3179-standalone:shared-" + $cache_channel),
+                type: "registry"
+              }
+            ] else [] end)) and
+            .args == ($expected_build_args + {
+              SOURCE_REVISION: $source_revision
+            }) and
+            ((keys - [
+              "args", "cache-from", "cache-to", "context", "dockerfile",
+              "output", "platforms", "target"
+            ]) == [])) and
+          (.target.pd |
+            runtime_target(
+              "hugegraph-pd/Dockerfile";
+              "ghcr.io/lokidundun/issue3179-pd:" + $image_tag;
+              "ghcr.io/lokidundun/issue3179-pd:buildcache-"
+            )) and
+          (.target.store |
+            runtime_target(
+              "hugegraph-store/Dockerfile";
+              "ghcr.io/lokidundun/issue3179-store:" + $image_tag;
+              "ghcr.io/lokidundun/issue3179-store:buildcache-"
+            )) and
+          (.target["server-hstore"] |
+            runtime_target(
+              "hugegraph-server/Dockerfile-hstore";
+              "ghcr.io/lokidundun/issue3179-server:" + $image_tag;
+              "ghcr.io/lokidundun/issue3179-server:buildcache-"
+            )) and
+          (.target["server-standalone"] |
+            runtime_target(
+              "hugegraph-server/Dockerfile";
+              "ghcr.io/lokidundun/issue3179-standalone:" + $image_tag;
+              "ghcr.io/lokidundun/issue3179-standalone:buildcache-"
+            ))
+        ' /tmp/hugegraph-bake.json
+    - name: Login to personal GHCR test registry
+      uses: docker/login-action@v4
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Precheck cleanup
+      run: |
+        docker system prune -af || true
+        docker builder prune -af || true
+    - name: Build multi-platform candidates with retries
+      id: build
+      run: |
+        set -euo pipefail
+
+        build_started_at="$(date +%s)"
+        build_args=()
+        while IFS= read -r build_arg; do
+          if [ -z "$build_arg" ]; then
+            continue
+          fi
+          build_arg_name="${build_arg%%=*}"
+          if [ "$build_arg_name" = "$build_arg" ] \
+            || ! [[ "$build_arg_name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+            echo "Invalid mvn_args entry; expected one NAME=VALUE build argument per line"
+            exit 1
+          fi
+          if [ "$build_arg_name" = "SOURCE_REVISION" ]; then
+            echo "mvn_args must not override reserved build argument SOURCE_REVISION"
+            exit 1
+          fi
+          build_args+=("$build_arg")
+        done <<< "$MVN_ARGS"
+
+        build_candidate() {
+          local module="$1" image="$2" dockerfile="$3" cache_repo="$4"
+          local attempt succeeded
+          local -a build_command
+          succeeded="false"
+
+          for attempt in 1 2 3; do
+            echo "Building ${module} (attempt ${attempt}/3) at $(date -u +%FT%TZ)"
+            build_command=(
+              docker buildx build
+              --file "$dockerfile"
+              --platform "linux/amd64,linux/arm64"
+              --tag "$image"
+              --cache-from "type=registry,ref=${cache_repo}:buildcache-${CACHE_CHANNEL}"
+              --load
+              --build-arg "SOURCE_REVISION=${SOURCE_SHA}"
+            )
+            if [ "$PUBLISH_IMAGES" = "true" ]; then
+              build_command+=(
+                --cache-to "type=registry,ref=${cache_repo}:buildcache-${CACHE_CHANNEL},mode=max"
+              )
+            fi
+            for build_arg in "${build_args[@]}"; do
+              build_command+=(--build-arg "$build_arg")
+            done
+            build_command+=(.)
+
+            if "${build_command[@]}"; then
+              succeeded="true"
+              echo "Built ${module} at $(date -u +%FT%TZ)"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Build failed for ${module}; retrying with cached layers"
+              sleep $((attempt * 5))
+            fi
+          done
+
+          if [ "$succeeded" != "true" ]; then
+            echo "Failed to build ${module} after 3 attempts"
+            return 1
+          fi
+        }
+
+        if [ -f docker/bake.hcl ]; then
+          echo "Using source-provided shared Buildx Bake graph"
+          bake_command=(
+            docker buildx bake
+            --file docker/bake.hcl
+            --progress=plain
+          )
+          for build_arg in "${build_args[@]}"; do
+            build_arg_name="${build_arg%%=*}"
+            bake_command+=(
+              --set "*.args.${build_arg_name}=${build_arg#*=}"
+            )
+          done
+
+          built="false"
+          for attempt in 1 2 3; do
+            echo "Building all candidates with Bake (attempt ${attempt}/3) at $(date -u +%FT%TZ)"
+            if "${bake_command[@]}" 2>&1 | tee -a /tmp/issue3179-build.log; then
+              built="true"
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Bake failed; retrying with completed BuildKit layers"
+              sleep $((attempt * 5))
+            fi
+          done
+          if [ "$built" != "true" ]; then
+            echo "Failed to build candidates with Bake after 3 attempts"
+            exit 1
+          fi
+        else
+          echo "docker/bake.hcl is unavailable; using serial compatibility build"
+          build_candidate pd "$PD_IMAGE" ./hugegraph-pd/Dockerfile ghcr.io/lokidundun/issue3179-pd
+          build_candidate store "$STORE_IMAGE" ./hugegraph-store/Dockerfile ghcr.io/lokidundun/issue3179-store
+          build_candidate server-hstore "$HSTORE_IMAGE" ./hugegraph-server/Dockerfile-hstore ghcr.io/lokidundun/issue3179-server
+          build_candidate server-standalone "$STANDALONE_IMAGE" ./hugegraph-server/Dockerfile ghcr.io/lokidundun/issue3179-standalone
+        fi
+
+        build_duration_seconds="$(( $(date +%s) - build_started_at ))"
+        echo "build_duration_seconds=$build_duration_seconds" >> "$GITHUB_OUTPUT"
+        echo "Built all multi-platform candidates in ${build_duration_seconds}s"
+      env:
+        IMAGE_TAG: ${{ inputs.image_tag }}
+        SOURCE_REVISION: ${{ inputs.source_ref }}
+        EXPORT_CACHE: 'true'
+    - name: Summarize candidate build timing
+      env:
+        BUILD_DURATION_SECONDS: ${{ steps.build.outputs.build_duration_seconds }}
+      run: |
+        {
+          echo
+          echo "## Candidate build timing"
+          echo
+          echo "- Duration: \`${BUILD_DURATION_SECONDS}s\`"
+          if [ -f docker/bake.hcl ]; then
+            echo "- Strategy: shared Buildx Bake graph"
+          else
+            echo "- Strategy: serial compatibility fallback"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+    - name: Verify locally loaded platform variants
+      run: |
+        set -euo pipefail
+        for image in "$PD_IMAGE" "$STORE_IMAGE" "$HSTORE_IMAGE" "$STANDALONE_IMAGE"; do
+          docker image inspect --platform linux/amd64 "$image" >/dev/null
+          docker image inspect --platform linux/arm64 "$image" >/dev/null
+          echo "Loaded amd64 and arm64 variants: ${image}"
+        done
+    - name: Start compose stack with local images
+      if: ${{ inputs.strict_mode }}
+      run: |
+        HUGEGRAPH_ADMIN_PASSWORD="$(openssl rand -hex 16)"
+        echo "::add-mask::$HUGEGRAPH_ADMIN_PASSWORD"
+        echo "HUGEGRAPH_ADMIN_PASSWORD=$HUGEGRAPH_ADMIN_PASSWORD" >> "$GITHUB_ENV"
+        export HUGEGRAPH_ADMIN_PASSWORD
+
+        if [ -f "docker/docker-compose-hstore.yml" ] \
+          && [ -f "docker/docker-compose.dev.yml" ]; then
+          # The current HugeGraph dev file is a thin HStore override. Keep the
+          # base topology in the command so its networks and named volumes are
+          # defined before the override is applied.
+          compose_file="docker/docker-compose-hstore.yml"
+          compose_dev_file="docker/docker-compose.dev.yml"
+        elif [ -f "docker/docker-compose.dev.yml" ]; then
+          # Older source revisions may still ship a self-contained dev file.
+          compose_file="docker/docker-compose.dev.yml"
+          compose_dev_file=""
+        elif [ -f "docker/docker-compose.yml" ]; then
+          compose_file="docker/docker-compose.yml"
+          compose_dev_file=""
+          echo "WARN: docker/docker-compose.dev.yml is unavailable; using legacy docker/docker-compose.yml"
+        else
+          echo "ERROR: no supported compose file found in $SOURCE_REPOSITORY@$SOURCE_SHA"
+          echo "Expected docker/docker-compose-hstore.yml plus docker/docker-compose.dev.yml,"
+          echo "or a self-contained docker/docker-compose.dev.yml or docker/docker-compose.yml."
+          exit 1
+        fi
+        echo "COMPOSE_FILE=$compose_file" >> "$GITHUB_ENV"
+        echo "COMPOSE_DEV_FILE=$compose_dev_file" >> "$GITHUB_ENV"
+
+        cat > /tmp/hg-ci-patch-server-config.sh <<'PATCH_SERVER'
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        set_property() {
+          local file="$1" key="$2" value="$3" escaped
+          escaped=${key//./\.}
+          if grep -qE "^[[:space:]]*${escaped}[[:space:]]*=" "$file"; then
+            sed -E -i "s|^[[:space:]]*${escaped}[[:space:]]*=.*|${key}=${value}|" "$file"
+          else
+            printf '%s=%s\n' "$key" "$value" >> "$file"
+          fi
+        }
+
+        set_yaml_scalar() {
+          local file="$1" key="$2" value="$3"
+          if grep -qE "^[[:space:]]*${key}:" "$file"; then
+            sed -E -i "s|^([[:space:]]*)${key}:.*|\1${key}: ${value}|" "$file"
+          else
+            printf '%s: %s\n' "$key" "$value" >> "$file"
+          fi
+        }
+
+        set_property ./conf/rest-server.properties batch.max_write_threads 4
+        set_property ./conf/rest-server.properties restserver.min_free_memory 32
+        set_yaml_scalar ./conf/gremlin-server.yaml threadPoolWorker 4
+        set_yaml_scalar ./conf/gremlin-server.yaml gremlinPool 4
+
+        echo "Applied CI Server resource configuration"
+        exec ./docker-entrypoint.sh
+        PATCH_SERVER
+        chmod 755 /tmp/hg-ci-patch-server-config.sh
+
+        cat > /tmp/docker-compose.ci.override.yml <<COMPOSE_OVERRIDE
+        services:
+          pd:
+            image: ${PD_IMAGE}
+            container_name: hg-pd
+            pull_policy: never
+            mem_limit: 1024m
+            cpus: 2.0
+            environment:
+              JAVA_OPTS: >-
+                -Xms128m -Xmx128m
+                -XX:ActiveProcessorCount=2
+                -XX:MaxMetaspaceSize=192m
+                -XX:MaxDirectMemorySize=128m
+                -XX:+UseContainerSupport
+                -Dlog4j2.asyncLoggerConfigRingBufferSize=8192
+                -DAsyncLoggerConfig.RingBufferSize=8192
+                -Dthread.pool.grpc.core=8
+                -Dthread.pool.grpc.max=32
+                -Dthread.pool.grpc.queue=512
+                -Djob.interruptableThreadPool.core=1
+                -Djob.interruptableThreadPool.max=8
+                -Djob.interruptableThreadPool.queue=256
+                -Djob.uninterruptibleThreadPool.core=0
+                -Djob.uninterruptibleThreadPool.max=4
+                -Djob.uninterruptibleThreadPool.queue=128
+                -Dpartition.default-shard-count=1
+                -Dpartition.store-max-shard-count=12
+          store:
+            image: ${STORE_IMAGE}
+            container_name: hg-store
+            pull_policy: never
+            mem_limit: 1024m
+            cpus: 2.0
+            environment:
+              JAVA_OPTS: >-
+                -Xms128m -Xmx128m
+                -XX:ActiveProcessorCount=2
+                -XX:MaxMetaspaceSize=192m
+                -XX:MaxDirectMemorySize=128m
+                -XX:+UseContainerSupport
+                -Dlog4j2.asyncLoggerConfigRingBufferSize=8192
+                -DAsyncLoggerConfig.RingBufferSize=8192
+                -Drocksdb.total_memory_size=134217728
+                -Drocksdb.write_buffer_size=2097152
+                -Drocksdb.min_write_buffer_number_to_merge=2
+                -Dthread.pool.grpc.core=8
+                -Dthread.pool.grpc.max=32
+                -Dthread.pool.grpc.queue=512
+                -Dthread.pool.scan.core=4
+                -Dthread.pool.scan.max=16
+                -Dthread.pool.scan.queue=256
+                -Djob.interruptableThreadPool.core=2
+                -Djob.interruptableThreadPool.max=8
+                -Djob.interruptableThreadPool.queue=256
+                -Djob.uninterruptibleThreadPool.core=0
+                -Djob.uninterruptibleThreadPool.max=4
+                -Djob.uninterruptibleThreadPool.queue=128
+                -Dquery.push-down.threads=8
+                -Dquery.push-down.fetch_batch=1000
+                -Dquery.push-down.fetch_timeout=30000
+                -Dquery.push-down.memory_limit_count=10000
+                -Dquery.push-down.index_size_limit_count=10000
+                -Draft.disruptorBufferSize=512
+                -Draft.metrics=false
+                -Draft.maxReplicatorInflightMsgs=32
+                -Draft.maxEntriesSize=64
+                -Draft.maxBodySize=262144
+          server:
+            image: ${HSTORE_IMAGE}
+            container_name: hg-server
+            pull_policy: never
+            mem_limit: 1536m
+            cpus: 4.0
+            entrypoint:
+              - /usr/bin/dumb-init
+              - "--"
+              - /opt/hg-ci/patch-server-config.sh
+            environment:
+              JAVA_OPTS: >-
+                -Xms256m -Xmx384m
+                -XX:ActiveProcessorCount=4
+                -XX:MaxMetaspaceSize=256m
+                -XX:MaxDirectMemorySize=128m
+                -XX:+UseContainerSupport
+                -Dlog4j2.asyncLoggerConfigRingBufferSize=8192
+                -DAsyncLoggerConfig.RingBufferSize=8192
+            volumes:
+              - type: bind
+                source: /tmp/hg-ci-patch-server-config.sh
+                target: /opt/hg-ci/patch-server-config.sh
+                read_only: true
+        COMPOSE_OVERRIDE
+
+        compose_args=(-f "$compose_file")
+        if [ -n "$compose_dev_file" ]; then
+          compose_args+=(-f "$compose_dev_file")
+        fi
+        docker compose \
+          -p hg-ci-precheck \
+          "${compose_args[@]}" \
+          -f /tmp/docker-compose.ci.override.yml \
+          up -d --wait --wait-timeout "$WAIT_TIMEOUT_SEC"
+
+        docker compose -p hg-ci-precheck "${compose_args[@]}" \
+          -f /tmp/docker-compose.ci.override.yml ps
+    - name: Verify CI resource limits
+      if: ${{ inputs.strict_mode }}
+      run: |
+        set -euo pipefail
+
+        assert_memory_limit() {
+          local container="$1" expected_bytes="$2" actual_bytes
+          actual_bytes="$(docker inspect --format '{{.HostConfig.Memory}}' "$container")"
+          if [ "$actual_bytes" != "$expected_bytes" ]; then
+            echo "Unexpected memory limit for ${container}: expected ${expected_bytes}, got ${actual_bytes}"
+            exit 1
+          fi
+          echo "${container} memory limit: ${actual_bytes} bytes"
+        }
+
+        assert_memory_limit hg-pd 1073741824
+        assert_memory_limit hg-store 1073741824
+        assert_memory_limit hg-server 1610612736
+
+        for container in hg-pd hg-store hg-server; do
+          docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" \
+            | grep '^JAVA_OPTS='
+          docker exec "$container" bash -lc "ps -eo args | grep '[j]ava'"
+        done
+        docker exec hg-server grep -E \
+          '^(batch.max_write_threads|restserver.min_free_memory)=' \
+          /hugegraph-server/conf/rest-server.properties
+        docker exec hg-server grep -E \
+          '^[[:space:]]*(threadPoolWorker|gremlinPool):' \
+          /hugegraph-server/conf/gremlin-server.yaml
+
+        docker stats --no-stream hg-pd hg-store hg-server
+    - name: Verify integration endpoints
+      if: ${{ inputs.strict_mode }}
+      run: |
+        curl -fsS --connect-timeout 3 --max-time 8 "http://127.0.0.1:8620/v1/health" >/dev/null
+        curl -fsS --connect-timeout 3 --max-time 8 "http://127.0.0.1:8520/v1/health" >/dev/null
+        curl -fsS --connect-timeout 3 --max-time 8 "http://127.0.0.1:8080/versions" >/dev/null
+    - name: Import bundled example graph
+      if: ${{ inputs.strict_mode }}
+      run: |
+        set -euo pipefail
+
+        docker exec hg-server test -r /hugegraph-server/scripts/example.groovy
+        docker exec hg-server bash -lc \
+          'cd /hugegraph-server && bin/gremlin-console.sh -- -e scripts/example.groovy' \
+          | tee /tmp/hg-ci-example-import.log
+
+        grep -Fq '>>>> query all vertices: size=6' /tmp/hg-ci-example-import.log
+        grep -Fq '>>>> query all edges: size=6' /tmp/hg-ci-example-import.log
+    - name: Verify bundled graph with Gremlin CRUD
+      if: ${{ inputs.strict_mode }}
+      env:
+        CI_VERTEX_NAME: hg-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      run: |
+        set -euo pipefail
+
+        gremlin_request() {
+          local label="$1" script="$2" payload response_file
+          response_file="/tmp/hg-ci-gremlin-${label}.json"
+          payload="$(
+            jq -nc --arg gremlin "$script" \
+              '{gremlin:$gremlin,bindings:{},language:"gremlin-groovy",aliases:{graph:"DEFAULT-hugegraph",g:"__g_DEFAULT-hugegraph"}}'
+          )"
+          curl --fail-with-body -sS \
+            --compressed \
+            --connect-timeout 3 \
+            --max-time 30 \
+            --user "admin:$HUGEGRAPH_ADMIN_PASSWORD" \
+            -H 'Content-Type: application/json' \
+            --data-binary "$payload" \
+            http://127.0.0.1:8080/gremlin \
+            | tee "$response_file"
+          jq -e '.status.code == 200' "$response_file" >/dev/null
+        }
+
+        baseline_script="[[vertices:g.V().count().next(),edges:g.E().count().next(),names:g.V().values('name').order().toList(),markoCreated:g.V().has('person','name','marko').out('created').values('name').order().toList()]]"
+        gremlin_request baseline "$baseline_script"
+        jq -e '
+          .result.data[0].vertices == 6 and
+          .result.data[0].edges == 6 and
+          .result.data[0].names == ["josh","lop","marko","peter","ripple","vadas"] and
+          .result.data[0].markoCreated == ["lop"]
+        ' /tmp/hg-ci-gremlin-baseline.json >/dev/null
+
+        create_script="ci=graph.addVertex(T.label,'person','name','${CI_VERTEX_NAME}','age',40,'city','CI');marko=g.V().has('person','name','marko').next();marko.addEdge('knows',ci,'date','ci','weight',0.1d);graph.tx().commit();'${CI_VERTEX_NAME}'"
+        gremlin_request create "$create_script"
+        jq -e --arg name "$CI_VERTEX_NAME" '.result.data == [$name]' \
+          /tmp/hg-ci-gremlin-create.json >/dev/null
+
+        read_created_script="[[vertices:g.V().count().next(),edges:g.E().count().next(),matches:g.V().has('person','name','marko').out('knows').has('name','${CI_VERTEX_NAME}').count().next()]]"
+        gremlin_request read-created "$read_created_script"
+        jq -e '
+          .result.data[0].vertices == 7 and
+          .result.data[0].edges == 7 and
+          .result.data[0].matches == 1
+        ' /tmp/hg-ci-gremlin-read-created.json >/dev/null
+
+        update_script="g.V().has('person','name','${CI_VERTEX_NAME}').property('age',41).iterate();graph.tx().commit();g.V().has('person','name','${CI_VERTEX_NAME}').values('age').next()"
+        gremlin_request update "$update_script"
+        jq -e '.result.data == [41]' /tmp/hg-ci-gremlin-update.json >/dev/null
+
+        delete_script="ci=g.V().has('person','name','${CI_VERTEX_NAME}').next();g.V(ci).bothE().drop().iterate();g.V(ci).drop().iterate();graph.tx().commit();[[vertices:g.V().count().next(),edges:g.E().count().next()]]"
+        gremlin_request delete "$delete_script"
+        jq -e '
+          .result.data[0].vertices == 6 and
+          .result.data[0].edges == 6
+        ' /tmp/hg-ci-gremlin-delete.json >/dev/null
+
+        gremlin_request final "$baseline_script"
+        jq -e '
+          .result.data[0].vertices == 6 and
+          .result.data[0].edges == 6 and
+          .result.data[0].names == ["josh","lop","marko","peter","ripple","vadas"]
+        ' /tmp/hg-ci-gremlin-final.json >/dev/null
+
+        docker stats --no-stream hg-pd hg-store hg-server
+    - name: Dump compose logs on failure
+      if: ${{ failure() && inputs.strict_mode }}
+      run: |
+        if [ -n "${COMPOSE_FILE:-}" ] && [ -f /tmp/docker-compose.ci.override.yml ]; then
+          compose_args=(-f "$COMPOSE_FILE")
+          if [ -n "${COMPOSE_DEV_FILE:-}" ]; then
+            compose_args+=(-f "$COMPOSE_DEV_FILE")
+          fi
+          docker compose -p hg-ci-precheck "${compose_args[@]}" \
+            -f /tmp/docker-compose.ci.override.yml ps || true
+          docker compose -p hg-ci-precheck "${compose_args[@]}" \
+            -f /tmp/docker-compose.ci.override.yml logs --no-color --tail=200 || true
+        else
+          echo "Compose stack was not started; COMPOSE_FILE or CI override is unavailable"
+        fi
+        docker stats --no-stream hg-pd hg-store hg-server || true
+        for container in hg-pd hg-store hg-server; do
+          docker inspect --format '{{json .State.Health}}' "$container" || true
+        done
+        for artifact in /tmp/hg-ci-example-import.log /tmp/hg-ci-gremlin-*.json; do
+          if [ -f "$artifact" ]; then
+            echo "===== ${artifact} ====="
+            cat "$artifact"
+          fi
+        done
+    - name: Stop compose stack
+      if: ${{ always() }}
+      run: |
+        set -euo pipefail
+
+        if [ -n "${COMPOSE_FILE:-}" ] && [ -f /tmp/docker-compose.ci.override.yml ]; then
+          compose_args=(-f "$COMPOSE_FILE")
+          if [ -n "${COMPOSE_DEV_FILE:-}" ]; then
+            compose_args+=(-f "$COMPOSE_DEV_FILE")
+          fi
+          docker compose \
+            -p hg-ci-precheck \
+            "${compose_args[@]}" \
+            -f /tmp/docker-compose.ci.override.yml \
+            down -v --remove-orphans
+        else
+          echo "Compose stack was not started; skipping compose down"
+        fi
+
+        leftover_containers="$(docker ps -aq --filter label=com.docker.compose.project=hg-ci-precheck)"
+        leftover_networks="$(docker network ls -q --filter label=com.docker.compose.project=hg-ci-precheck)"
+        leftover_volumes="$(docker volume ls -q --filter label=com.docker.compose.project=hg-ci-precheck)"
+        if [ -n "$leftover_containers$leftover_networks$leftover_volumes" ]; then
+          echo "Compose cleanup left resources behind"
+          docker ps -a --filter label=com.docker.compose.project=hg-ci-precheck
+          docker network ls --filter label=com.docker.compose.project=hg-ci-precheck
+          docker volume ls --filter label=com.docker.compose.project=hg-ci-precheck
+          exit 1
+        fi
+        echo "Compose cleanup removed all project containers, networks, and volumes"
+    - name: Smoke test standalone Server candidate
+      if: ${{ success() }}
+      run: |
+        set -euo pipefail
+        docker run --pull=never -d --name=hg-ci-standalone -p 18080:8080 "$STANDALONE_IMAGE"
+        for attempt in $(seq 1 30); do
+          if curl -fsS --connect-timeout 3 --max-time 8 http://127.0.0.1:18080/versions >/dev/null; then
+            echo "Standalone candidate is ready after attempt ${attempt}"
+            exit 0
+          fi
+          if ! docker inspect --format '{{.State.Running}}' hg-ci-standalone | grep -qx true; then
+            docker logs hg-ci-standalone
+            exit 1
+          fi
+          sleep 2
+        done
+        docker logs hg-ci-standalone
+        exit 1
+    - name: Push tested multi-platform candidates
+      if: ${{ success() && true }}
+      run: |
+        set -euo pipefail
+        for image in "$PD_IMAGE" "$STORE_IMAGE" "$HSTORE_IMAGE" "$STANDALONE_IMAGE"; do
+          pushed="false"
+          for attempt in 1 2 3; do
+            echo "Pushing tested multi-platform candidate ${image} (attempt ${attempt}/3)"
+            if docker push "$image"; then
+              pushed="true"
+              break
+            fi
+            sleep $((attempt * 5))
+          done
+          if [ "$pushed" != "true" ]; then
+            echo "Failed to push ${image} after 3 attempts"
+            exit 1
+          fi
+        done
+    - name: Verify published architecture manifests
+      run: |
+        set -euo pipefail
+        for image in "$PD_IMAGE" "$STORE_IMAGE" "$HSTORE_IMAGE" "$STANDALONE_IMAGE"; do
+          docker buildx imagetools inspect --raw "$image" | jq -e '
+            [.manifests[].platform | .os + "/" + .architecture] |
+            index("linux/amd64") != null and index("linux/arm64") != null'
+        done
+    - name: Cleanup standalone container
+      if: ${{ always() }}
+      run: docker rm -f hg-ci-standalone >/dev/null 2>&1 || true
+    - name: Post-check cleanup
+      if: ${{ always() }}
+      run: |
+        docker system prune -af || true
+        docker builder prune -af || true
+    - name: Record build and complete validation timing
+      if: ${{ always() }}
+      env:
+        BUILD_SECONDS: ${{ steps.build.outputs.build_duration_seconds }}
+        VALIDATION_STATUS: ${{ job.status }}
+        ARTIFACT_REVISION: ${{ inputs.artifact_revision }}
+      run: |
+        python3 - <<'PY'
+        import json, os, time
+        result = dict(artifact_revision=os.environ['ARTIFACT_REVISION'], source=os.environ['SOURCE_SHA'], tag=os.environ['VERSION_TAG'],
+                      cache_channel=os.environ['CACHE_CHANNEL'], status=os.environ['VALIDATION_STATUS'],
+                      build_seconds=os.environ.get('BUILD_SECONDS', ''),
+                      validation_seconds=int(time.time())-int(os.environ['BENCHMARK_STARTED']))
+        with open('/tmp/issue3179-timing.json','w') as f: json.dump(result,f,indent=2)
+        with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+            f.write('\n### Fork benchmark timing\n\n'+json.dumps(result,indent=2)+'\n')
+        print(json.dumps(result))
+        PY
+    - name: Upload benchmark evidence
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: issue3179-${{ inputs.image_tag }}
+        path: |-
+          /tmp/issue3179-*.json
+          /tmp/issue3179-build.log
+          /tmp/hugegraph-bake.json
+          /tmp/hg-ci-*.json
+          /tmp/hg-ci-*.log
+        retention-days: 14
+    timeout-minutes: 60

@@ -1,0 +1,45 @@
+# Fork-only validation harness adapted from hugegraph/actions.
+name: Issue 3179 fork benchmark
+'on':
+  push:
+    branches:
+    - codex/issue-3179-ci
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: issue3179-fork-benchmark
+  cancel-in-progress: false
+jobs:
+  seed:
+    name: seed (${{ matrix.variant }})
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: &id001
+        include:
+        - variant: baseline
+          sha: 36811483a2040f70ca6923a288a8c28cad0086c0
+        - variant: candidate
+          sha: 6a8e1368ec636e68dbc30317e78b385e28c8e325
+    uses: ./.github/workflows/issue3179-validation.yml
+    with:
+      source_ref: ${{ matrix.sha }}
+      image_tag: issue3179-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.variant }}-seed
+      cache_channel: issue3179-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.variant }}
+      artifact_revision: ''
+    if: ${{ github.repository == 'lokidundun/incubator-hugegraph' }}
+  changed:
+    name: changed (${{ matrix.variant }})
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: *id001
+    uses: ./.github/workflows/issue3179-validation.yml
+    with:
+      source_ref: ${{ matrix.sha }}
+      image_tag: issue3179-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.variant }}-changed
+      cache_channel: issue3179-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.variant }}
+      artifact_revision: changed
+    needs: seed

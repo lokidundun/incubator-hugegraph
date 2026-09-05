@@ -45,7 +45,7 @@ jobs:
       run: |
         git worktree add --detach source 6a8e1368ec636e68dbc30317e78b385e28c8e325
         test -f source/hugegraph-pd/hg-pd-dist/docker/docker-entrypoint.sh
-        test -f source/hugegraph-store/hg-store-dist/src/assembly/static/bin/libjemalloc_aarch64.so
+        test -f source/hugegraph-store/hg-store-dist/src/assembly/static/bin/util.sh
         test -f source/docker/docker-compose-hstore.yml
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
@@ -112,7 +112,7 @@ jobs:
       run: |
         git worktree add --detach source 6a8e1368ec636e68dbc30317e78b385e28c8e325
         test -f source/hugegraph-pd/hg-pd-dist/docker/docker-entrypoint.sh
-        test -f source/hugegraph-store/hg-store-dist/src/assembly/static/bin/libjemalloc_aarch64.so
+        test -f source/hugegraph-store/hg-store-dist/src/assembly/static/bin/util.sh
         test -f source/docker/docker-compose-hstore.yml
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v4
@@ -227,7 +227,7 @@ jobs:
       run: |
         git worktree add --detach source 6a8e1368ec636e68dbc30317e78b385e28c8e325
         test -f source/hugegraph-pd/hg-pd-dist/docker/docker-entrypoint.sh
-        test -f source/hugegraph-store/hg-store-dist/src/assembly/static/bin/libjemalloc_aarch64.so
+        test -f source/hugegraph-store/hg-store-dist/src/assembly/static/bin/util.sh
         test -f source/docker/docker-compose-hstore.yml
     - &id003
       name: Set up Docker with containerd image store

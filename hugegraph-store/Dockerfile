@@ -35,7 +35,6 @@ RUN --mount=type=cache,id=hugegraph-maven-${SOURCE_REVISION},target=/root/.m2,sh
 # Note: ZGC (The Z Garbage Collector) is only supported on ARM-Mac with java > 13
 FROM eclipse-temurin:11-jre-jammy
 
-COPY --from=build /pkg/hugegraph-store/apache-hugegraph-store-*/ /hugegraph-store/
 LABEL maintainer="HugeGraph Docker Maintainers <dev@hugegraph.apache.org>"
 
 # TODO: use g1gc or zgc as default
@@ -57,6 +56,8 @@ RUN apt-get -q update \
        vim \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /pkg/hugegraph-store/apache-hugegraph-store-*/ /hugegraph-store/
 
 # 2. Init docker script
 COPY hugegraph-store/hg-store-dist/docker/docker-entrypoint.sh .

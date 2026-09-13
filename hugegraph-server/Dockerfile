@@ -25,10 +25,11 @@ WORKDIR /pkg
 COPY . .
 
 ARG MAVEN_ARGS
+ARG MAVEN_PROJECTS="hugegraph-server/hugegraph-dist,hugegraph-pd/hg-pd-dist,hugegraph-store/hg-store-dist"
 ARG SOURCE_REVISION=local
 
 RUN --mount=type=cache,id=hugegraph-maven-${SOURCE_REVISION},target=/root/.m2,sharing=locked \
-    mvn install -pl hugegraph-server/hugegraph-dist,hugegraph-pd/hg-pd-dist,hugegraph-store/hg-store-dist \
+    mvn install -pl "$MAVEN_PROJECTS" \
         -am $MAVEN_ARGS -e -B -ntp -Dmaven.test.skip=true -Dmaven.javadoc.skip=true \
     && rm ./hugegraph-server/*.tar.gz ./hugegraph-pd/*.tar.gz ./hugegraph-store/*.tar.gz
 
@@ -51,6 +52,7 @@ WORKDIR /hugegraph-server/
 # jammy base image ships neither ss nor netstat, so without it the preflight is
 # permanently inconclusive and a duplicate start is no longer caught.  It
 # replaces lsof, which no shipped script calls any more.
+ARG RUNTIME_DEPS_EPOCH=1
 RUN apt-get -q update \
     && apt-get -q install -y --no-install-recommends --no-install-suggests \
        dumb-init \
